@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/WindowsForms/">
+    <Project Path="WindowsForms/Microsoft.AspNetCore.Components.WebView.WindowsForms.csproj" />
+  </Folder>
+  <Folder Name="/Wpf/">
+    <Project Path="Wpf/Microsoft.AspNetCore.Components.WebView.Wpf.csproj" />
+  </Folder>
+</Solution>
