@@ -1,13 +1,10 @@
-﻿using System;
+using System;
 #if WEBVIEW2_WINFORMS
 using Microsoft.AspNetCore.Components.WebView.WindowsForms;
 #elif WEBVIEW2_WPF
 using Microsoft.AspNetCore.Components.WebView.Wpf;
-#elif WEBVIEW2_MAUI
-using Microsoft.AspNetCore.Components.WebView.Maui;
-using Microsoft.Maui.Hosting;
 #else
-#error Must define WEBVIEW2_WINFORMS, WEBVIEW2_WPF, WEBVIEW2_MAUI
+#error Must define WEBVIEW2_WINFORMS or WEBVIEW2_WPF
 #endif
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -28,26 +25,11 @@ namespace Microsoft.Extensions.DependencyInjection
 		public static IWindowsFormsBlazorWebViewBuilder AddWindowsFormsBlazorWebView(this IServiceCollection services)
 #elif WEBVIEW2_WPF
 		public static IWpfBlazorWebViewBuilder AddWpfBlazorWebView(this IServiceCollection services)
-#elif WEBVIEW2_MAUI
-#if ANDROID
-	    [System.Runtime.Versioning.SupportedOSPlatform(BlazorWebView.AndroidSupportedOSPlatformVersion)]
-#elif IOS
-		[System.Runtime.Versioning.SupportedOSPlatform(BlazorWebView.iOSSupportedOSPlatformVersion)]
-#elif MACCATALYST
-		[System.Runtime.Versioning.SupportedOSPlatform(BlazorWebView.MacCatalystSupportedOSPlatformVersion)]
-#endif
-		public static IMauiBlazorWebViewBuilder AddMauiBlazorWebView(this IServiceCollection services)
-#else
-#error Must define WEBVIEW2_WINFORMS, WEBVIEW2_WPF, WEBVIEW2_MAUI
 #endif
 		{
 			services.AddBlazorWebView();
 			services.TryAddSingleton(new BlazorWebViewDeveloperTools { Enabled = false });
-#if WEBVIEW2_MAUI
-			services.TryAddSingleton(_ => new MauiBlazorMarkerService());
-			services.ConfigureMauiHandlers(static handlers => handlers.AddHandler<IBlazorWebView>(_ => new BlazorWebViewHandler()));
-			return new MauiBlazorWebViewBuilder(services);
-#elif WEBVIEW2_WINFORMS
+#if WEBVIEW2_WINFORMS
 			services.TryAddSingleton(_ => new WindowsFormsBlazorMarkerService());
 			return new WindowsFormsBlazorWebViewBuilder(services);
 #elif WEBVIEW2_WPF

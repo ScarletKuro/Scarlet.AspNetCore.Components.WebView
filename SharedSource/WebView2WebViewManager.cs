@@ -1,7 +1,7 @@
 // Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
-#if !WEBVIEW2_WINFORMS && !WEBVIEW2_WPF && !WEBVIEW2_MAUI
+#if !WEBVIEW2_WINFORMS && !WEBVIEW2_WPF
 #error Must specify which WebView2 is targeted
 #endif
 
@@ -30,12 +30,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Web.WebView2.Core;
 using WebView2Control = Microsoft.Web.WebView2.Wpf.WebView2CompositionControl;
 using System.Reflection;
-#elif WEBVIEW2_MAUI
-using Microsoft.AspNetCore.Components.WebView.Maui;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Web.WebView2.Core;
-using WebView2Control = Microsoft.UI.Xaml.Controls.WebView2;
-using Launcher = Windows.System.Launcher;
 #endif
 
 namespace Microsoft.AspNetCore.Components.WebView.WebView2
@@ -62,7 +56,6 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 		private readonly Task<bool> _webviewReadyTask;
 		private readonly string _contentRootRelativeToAppRoot;
 
-#if WEBVIEW2_WINFORMS || WEBVIEW2_WPF
 		private protected CoreWebView2Environment? _coreWebView2Environment;
 		private readonly Action<UrlLoadingEventArgs> _urlLoading;
 		private readonly Action<BlazorWebViewInitializingEventArgs> _blazorWebViewInitializing;
@@ -129,55 +122,6 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 			// so keep track of a task we can await during LoadUri.
 			_webviewReadyTask = TryInitializeWebView2();
 		}
-#elif WEBVIEW2_MAUI
-		private protected CoreWebView2Environment? _coreWebView2Environment;
-		private readonly BlazorWebViewHandler _blazorWebViewHandler;
-
-		/// <summary>
-		/// Constructs an instance of <see cref="WebView2WebViewManager"/>.
-		/// </summary>
-		/// <param name="webview">A <see cref="WebView2Control"/> to access platform-specific WebView2 APIs.</param>
-		/// <param name="services">A service provider containing services to be used by this class and also by application code.</param>
-		/// <param name="dispatcher">A <see cref="Dispatcher"/> instance that can marshal calls to the required thread or sync context.</param>
-		/// <param name="fileProvider">Provides static content to the webview.</param>
-		/// <param name="jsComponents">Describes configuration for adding, removing, and updating root components from JavaScript code.</param>
-		/// <param name="contentRootRelativeToAppRoot">Path to the app's content root relative to the application root directory.</param>
-		/// <param name="hostPagePathWithinFileProvider">Path to the host page within the <paramref name="fileProvider"/>.</param>
-		/// <param name="blazorWebViewHandler">The <see cref="BlazorWebViewHandler" />.</param>
-		/// <param name="logger">Logger to send log messages to.</param>
-		internal WebView2WebViewManager(
-			WebView2Control webview,
-			IServiceProvider services,
-			Dispatcher dispatcher,
-			IFileProvider fileProvider,
-			JSComponentConfigurationStore jsComponents,
-			string contentRootRelativeToAppRoot,
-			string hostPagePathWithinFileProvider,
-			BlazorWebViewHandler blazorWebViewHandler,
-			ILogger logger
-		)
-			: base(services, dispatcher, AppOriginUri, fileProvider, jsComponents, hostPagePathWithinFileProvider)
-		{
-			ArgumentNullException.ThrowIfNull(webview);
-
-			if (services.GetService<MauiBlazorMarkerService>() is null)
-			{
-				throw new InvalidOperationException(
-					"Unable to find the required services. " +
-					$"Please add all the required services by calling '{nameof(IServiceCollection)}.{nameof(BlazorWebViewServiceCollectionExtensions.AddMauiBlazorWebView)}' in the application startup code.");
-			}
-
-			_logger = logger;
-			_webview = webview;
-			_blazorWebViewHandler = blazorWebViewHandler;
-			_contentRootRelativeToAppRoot = contentRootRelativeToAppRoot;
-
-			// Unfortunately the CoreWebView2 can only be instantiated asynchronously.
-			// We want the external API to behave as if initalization is synchronous,
-			// so keep track of a task we can await during LoadUri.
-			_webviewReadyTask = TryInitializeWebView2();
-		}
-#endif
 
 		/// <inheritdoc />
 		protected override void NavigateCore(Uri absoluteUri)
@@ -201,35 +145,6 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 		private async Task<bool> TryInitializeWebView2()
 		{
 			var args = new BlazorWebViewInitializingEventArgs();
-#if WEBVIEW2_MAUI
-			_blazorWebViewHandler.VirtualView.BlazorWebViewInitializing(args);
-
-			try
-			{
-				_coreWebView2Environment = await CoreWebView2Environment.CreateWithOptionsAsync(
-					browserExecutableFolder: args.BrowserExecutableFolder,
-					userDataFolder: args.UserDataFolder,
-					options: args.EnvironmentOptions)
-					.AsTask()
-					.ConfigureAwait(true);
-			}
-			catch (FileNotFoundException)
-			{
-				_logger.FailedToCreateWebView2Environment();
-
-				// This method needs to be invoked even if the WebView2 Runtime is not installed,
-				// since it is reponsible for creating the warning label and WebView2 Runtime
-				// download link.
-				await _webview.EnsureCoreWebView2Async();
-				return false;
-			}
-
-			_logger.StartingWebView2();
-			await _webview.EnsureCoreWebView2Async();
-			_logger.StartedWebView2();
-
-			var developerTools = _blazorWebViewHandler.DeveloperTools;
-#elif WEBVIEW2_WINFORMS || WEBVIEW2_WPF
 			_blazorWebViewInitializing?.Invoke(args);
 			var userDataFolder = args.UserDataFolder ?? GetWebView2UserDataFolder();
 			_coreWebView2Environment = await CoreWebView2Environment.CreateAsync(
@@ -243,21 +158,13 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 			_logger.StartedWebView2();
 
 			var developerTools = _developerTools;
-#endif
 
 			ApplyDefaultWebViewSettings(developerTools);
 
-#if WEBVIEW2_MAUI
-			_blazorWebViewHandler.VirtualView.BlazorWebViewInitialized(new BlazorWebViewInitializedEventArgs
-			{
-				WebView = _webview,
-			});
-#elif WEBVIEW2_WINFORMS || WEBVIEW2_WPF
 			_blazorWebViewInitialized?.Invoke(new BlazorWebViewInitializedEventArgs
 			{
 				WebView = _webview,
 			});
-#endif
 
 			_webview.CoreWebView2.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
 
@@ -281,9 +188,6 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 					}
 				};
 			")
-#if WEBVIEW2_MAUI
-				.AsTask()
-#endif
 				.ConfigureAwait(true);
 
 			QueueBlazorStart();
@@ -299,7 +203,6 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 		/// <param name="eventArgs">The <see cref="CoreWebView2WebResourceRequestedEventArgs"/>.</param>
 		protected virtual Task HandleWebResourceRequest(CoreWebView2WebResourceRequestedEventArgs eventArgs)
 		{
-#if WEBVIEW2_WINFORMS || WEBVIEW2_WPF
 			// Unlike server-side code, we get told exactly why the browser is making the request,
 			// so we can be smarter about fallback. We can ensure that 'fetch' requests never result
 			// in fallback, for example.
@@ -327,9 +230,6 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 			{
 				_logger.ResponseContentNotFound(requestUri);
 			}
-#elif WEBVIEW2_MAUI
-			// No-op here because all the work is done in the derived WinUIWebViewManager
-#endif
 			return Task.CompletedTask;
 		}
 
@@ -346,11 +246,7 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 			{
 				var callbackArgs = UrlLoadingEventArgs.CreateWithDefaultLoadingStrategy(uri, AppOriginUri);
 
-#if WEBVIEW2_WINFORMS || WEBVIEW2_WPF
 				_urlLoading?.Invoke(callbackArgs);
-#elif WEBVIEW2_MAUI
-				_blazorWebViewHandler.UrlLoading(callbackArgs);
-#endif
 				_logger.NavigationEvent(uri, callbackArgs.UrlLoadingStrategy);
 
 				if (callbackArgs.UrlLoadingStrategy == UrlLoadingStrategy.OpenExternally)
@@ -377,16 +273,12 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 		{
 			_logger.LaunchExternalBrowser(uri);
 
-#if WEBVIEW2_WINFORMS || WEBVIEW2_WPF
 			using (var launchBrowser = new Process())
 			{
 				launchBrowser.StartInfo.UseShellExecute = true;
 				launchBrowser.StartInfo.FileName = uri.ToString();
 				launchBrowser.Start();
 			}
-#elif WEBVIEW2_MAUI
-			_ = Launcher.LaunchUriAsync(uri);
-#endif
 		}
 
 		private protected static string GetHeaderString(IDictionary<string, string> headers) =>
@@ -403,7 +295,6 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 			_webview.CoreWebView2.Settings.IsStatusBarEnabled = false;
 		}
 
-#if WEBVIEW2_WINFORMS || WEBVIEW2_WPF
 		private static string? GetWebView2UserDataFolder()
 		{
 			if (Assembly.GetEntryAssembly() is { } mainAssembly)
@@ -421,7 +312,6 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 
 			return null;
 		}
-#endif
 	}
 }
 
