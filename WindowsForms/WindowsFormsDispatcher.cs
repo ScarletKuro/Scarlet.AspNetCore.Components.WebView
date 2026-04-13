@@ -54,10 +54,11 @@ namespace Microsoft.AspNetCore.Components.WebView.WindowsForms
 			}
 			catch (Exception ex)
 			{
-				// TODO: Determine whether this is the right kind of rethrowing pattern
-				// You do have to do something like this otherwise unhandled exceptions
-				// throw from inside Dispatcher.InvokeAsync are simply lost.
-				_ = _dispatchThreadControl.BeginInvoke(RethrowException, ex);
+				// Surface unhandled exceptions on the UI thread so they're not silently lost,
+				// but skip that promotion when the host control is disposed/disposing or when
+				// the exception is the known disposed-renderer race (see SafeRethrowOnDispatcher).
+				// The throw below still faults the returned Task for any awaiting caller.
+				SafeRethrowOnDispatcher(ex);
 				throw;
 			}
 		}
@@ -98,10 +99,7 @@ namespace Microsoft.AspNetCore.Components.WebView.WindowsForms
 			}
 			catch (Exception ex)
 			{
-				// TODO: Determine whether this is the right kind of rethrowing pattern
-				// You do have to do something like this otherwise unhandled exceptions
-				// throw from inside Dispatcher.InvokeAsync are simply lost.
-				_ = _dispatchThreadControl.BeginInvoke(RethrowException, ex);
+				SafeRethrowOnDispatcher(ex);
 				throw;
 			}
 		}
@@ -122,10 +120,7 @@ namespace Microsoft.AspNetCore.Components.WebView.WindowsForms
 			}
 			catch (Exception ex)
 			{
-				// TODO: Determine whether this is the right kind of rethrowing pattern
-				// You do have to do something like this otherwise unhandled exceptions
-				// throw from inside Dispatcher.InvokeAsync are simply lost.
-				_ = _dispatchThreadControl.BeginInvoke(RethrowException, ex);
+				SafeRethrowOnDispatcher(ex);
 				throw;
 			}
 		}
@@ -167,12 +162,47 @@ namespace Microsoft.AspNetCore.Components.WebView.WindowsForms
 			}
 			catch (Exception ex)
 			{
-				// TODO: Determine whether this is the right kind of rethrowing pattern
-				// You do have to do something like this otherwise unhandled exceptions
-				// throw from inside Dispatcher.InvokeAsync are simply lost.
-				_ = _dispatchThreadControl.BeginInvoke(RethrowException, ex);
+				SafeRethrowOnDispatcher(ex);
 				throw;
 			}
 		}
+
+		private void SafeRethrowOnDispatcher(Exception ex)
+		{
+			if (_dispatchThreadControl.IsDisposed ||
+				_dispatchThreadControl.Disposing ||
+				!_dispatchThreadControl.IsHandleCreated)
+			{
+				// No surviving UI thread to receive the rethrow.
+				return;
+			}
+
+			if (IsRendererDisposedRace(ex))
+			{
+				// Upstream aspnetcore bug: Renderer.HandleComponentException throws when the
+				// target component has already been removed from the renderer (disposed /
+				// navigated away) while a dispatched work item was still in flight. Promoting
+				// it to the UI thread would crash the app via the unhandled exception path.
+				// The exception still faults the returned Task so awaiting callers can observe it.
+				return;
+			}
+
+			try
+			{
+				_ = _dispatchThreadControl.BeginInvoke(RethrowException, ex);
+			}
+			catch (ObjectDisposedException)
+			{
+				// Race: the control was disposed between the check and BeginInvoke.
+			}
+			catch (InvalidOperationException)
+			{
+				// Race: the control's handle was destroyed between the check and BeginInvoke.
+			}
+		}
+
+		private static bool IsRendererDisposedRace(Exception ex) =>
+			ex is ArgumentException ae &&
+			ae.Message.StartsWith("The renderer does not have a component with ID", StringComparison.Ordinal);
 	}
 }

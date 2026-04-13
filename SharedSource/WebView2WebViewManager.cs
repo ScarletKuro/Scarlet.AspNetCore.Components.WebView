@@ -55,6 +55,7 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 		private readonly WebView2Control _webview;
 		private readonly Task<bool> _webviewReadyTask;
 		private readonly string _contentRootRelativeToAppRoot;
+		private bool _isDisposed;
 
 		private protected CoreWebView2Environment? _coreWebView2Environment;
 		private readonly Action<UrlLoadingEventArgs> _urlLoading;
@@ -126,8 +127,18 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 		/// <inheritdoc />
 		protected override void NavigateCore(Uri absoluteUri)
 		{
+			if (_isDisposed)
+			{
+				return;
+			}
+
 			_ = Dispatcher.InvokeAsync(async () =>
 			{
+				if (_isDisposed)
+				{
+					return;
+				}
+
 				var isWebviewInitialized = await _webviewReadyTask;
 
 				if (isWebviewInitialized)
@@ -140,7 +151,22 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 
 		/// <inheritdoc />
 		protected override void SendMessage(string message)
-			=> _webview.CoreWebView2.PostWebMessageAsString(message);
+		{
+			if (_isDisposed)
+			{
+				return;
+			}
+
+			try
+			{
+				_webview.CoreWebView2.PostWebMessageAsString(message);
+			}
+			catch (ObjectDisposedException)
+			{
+				// The WebView2 control has been disposed (e.g. the host window was closed)
+				// while an in-flight message was still pending. This is expected and safe to ignore.
+			}
+		}
 
 		private async Task<bool> TryInitializeWebView2()
 		{
@@ -293,6 +319,13 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 
 			// Desktop applications almost never want to show a URL preview when hovering over a link
 			_webview.CoreWebView2.Settings.IsStatusBarEnabled = false;
+		}
+
+		/// <inheritdoc />
+		protected override async ValueTask DisposeAsyncCore()
+		{
+			_isDisposed = true;
+			await base.DisposeAsyncCore();
 		}
 
 		private static string? GetWebView2UserDataFolder()
