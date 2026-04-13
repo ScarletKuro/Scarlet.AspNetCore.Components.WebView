@@ -167,7 +167,9 @@ namespace Microsoft.AspNetCore.Components.WebView.WindowsForms
 			}
 		}
 
-		private void SafeRethrowOnDispatcher(Exception ex)
+        // Fixes: https://github.com/dotnet/maui/issues/34855#issuecomment-4237810520
+        // If you call DispatchExceptionAsync when WebView is closed, it throws that component doesn't exist.
+        private void SafeRethrowOnDispatcher(Exception ex)
 		{
 			if (_dispatchThreadControl.IsDisposed ||
 				_dispatchThreadControl.Disposing ||

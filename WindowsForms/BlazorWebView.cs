@@ -265,8 +265,31 @@ namespace Microsoft.AspNetCore.Components.WebView.WindowsForms
 			}
 		}
 
-		/// <inheritdoc cref="Control.Dispose(bool)" />
-		protected override void Dispose(bool disposing)
+        /// <summary>
+        /// Disconnects the IPC bridge between the host application and the WebView.
+        /// </summary>
+        /// <remarks>
+        /// This method overrides the default IPC behavior by replacing the 
+        /// <c>window.external</c> object in the WebView with no-op implementations.
+        /// This prevents further message passing between JavaScript and the host.
+        ///
+        /// This is a workaround for a known issue:
+        /// https://github.com/dotnet/maui/issues/34855
+        /// </remarks>
+        protected virtual async Task DisconnectIpcAsync()
+        {
+            // Fixes: https://github.com/dotnet/maui/issues/34855
+            await WebView.CoreWebView2.ExecuteScriptAsync(
+                """
+                window.external = {
+                  sendMessage: message => {},
+                  receiveMessage: callback => {}
+                };
+                """);
+        }
+
+        /// <inheritdoc cref="Control.Dispose(bool)" />
+        protected override void Dispose(bool disposing)
 		{
 			if (disposing && _webviewManager is not null)
 			{

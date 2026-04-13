@@ -377,17 +377,41 @@ namespace Microsoft.AspNetCore.Components.WebView.Wpf
 			}
 		}
 
-		/// <summary>
-		/// Allows asynchronous disposal of the <see cref="BlazorWebView" />.
-		/// </summary>
-		protected virtual async ValueTask DisposeAsyncCore()
+        /// <summary>
+        /// Disconnects the IPC bridge between the host application and the WebView.
+        /// </summary>
+        /// <remarks>
+        /// This method overrides the default IPC behavior by replacing the 
+        /// <c>window.external</c> object in the WebView with no-op implementations.
+        /// This prevents further message passing between JavaScript and the host.
+        ///
+        /// This is a workaround for a known issue:
+        /// https://github.com/dotnet/maui/issues/34855
+        /// </remarks>
+        protected virtual async Task DisconnectIpcAsync()
+        {
+            // Fixes: https://github.com/dotnet/maui/issues/34855
+            await WebView.CoreWebView2.ExecuteScriptAsync(
+                """
+                window.external = {
+                  sendMessage: message => {},
+                  receiveMessage: callback => {}
+                };
+                """);
+        }
+
+        /// <summary>
+        /// Allows asynchronous disposal of the <see cref="BlazorWebView" />.
+        /// </summary>
+        protected virtual async ValueTask DisposeAsyncCore()
 		{
 			// Dispose this component's contents that user-written disposal logic and Razor component disposal logic will
 			// complete first. Then dispose the WebView2 control. This order is critical because once the WebView2 is
 			// disposed it will prevent and Razor component code from working because it requires the WebView to exist.
 			if (_webviewManager != null)
 			{
-				await _webviewManager.DisposeAsync()
+                // Fixes: https://github.com/dotnet/maui/issues/26746
+                await _webviewManager.DisposeAsync()
 					.ConfigureAwait(true);
 				_webviewManager = null;
 			}

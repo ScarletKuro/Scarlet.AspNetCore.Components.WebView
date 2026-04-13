@@ -51,4 +51,5 @@ static Microsoft.AspNetCore.Components.WebView.WindowsForms.RootComponentCollect
 static Microsoft.Extensions.DependencyInjection.BlazorWebViewServiceCollectionExtensions.AddBlazorWebViewDeveloperTools(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.Extensions.DependencyInjection.IServiceCollection!
 static Microsoft.Extensions.DependencyInjection.BlazorWebViewServiceCollectionExtensions.AddWindowsFormsBlazorWebView(this Microsoft.Extensions.DependencyInjection.IServiceCollection! services) -> Microsoft.AspNetCore.Components.WebView.WindowsForms.IWindowsFormsBlazorWebViewBuilder!
 virtual Microsoft.AspNetCore.Components.WebView.WindowsForms.BlazorWebView.CreateFileProvider(string! contentRootDir) -> Microsoft.Extensions.FileProviders.IFileProvider!
+virtual Microsoft.AspNetCore.Components.WebView.WindowsForms.BlazorWebView.DisconnectIpcAsync() -> System.Threading.Tasks.Task!
 virtual Microsoft.AspNetCore.Components.WebView.WindowsForms.BlazorWebView.TryDispatchAsync(System.Action<System.IServiceProvider!>! workItem) -> System.Threading.Tasks.Task<bool>!

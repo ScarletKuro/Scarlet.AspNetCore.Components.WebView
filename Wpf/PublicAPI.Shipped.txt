@@ -61,5 +61,6 @@ static readonly Microsoft.AspNetCore.Components.WebView.Wpf.BlazorWebView.Servic
 static readonly Microsoft.AspNetCore.Components.WebView.Wpf.BlazorWebView.StartPathProperty -> System.Windows.DependencyProperty!
 static readonly Microsoft.AspNetCore.Components.WebView.Wpf.BlazorWebView.UrlLoadingProperty -> System.Windows.DependencyProperty!
 virtual Microsoft.AspNetCore.Components.WebView.Wpf.BlazorWebView.CreateFileProvider(string! contentRootDir) -> Microsoft.Extensions.FileProviders.IFileProvider!
+virtual Microsoft.AspNetCore.Components.WebView.Wpf.BlazorWebView.DisconnectIpcAsync() -> System.Threading.Tasks.Task!
 virtual Microsoft.AspNetCore.Components.WebView.Wpf.BlazorWebView.DisposeAsyncCore() -> System.Threading.Tasks.ValueTask
 virtual Microsoft.AspNetCore.Components.WebView.Wpf.BlazorWebView.TryDispatchAsync(System.Action<System.IServiceProvider!>! workItem) -> System.Threading.Tasks.Task<bool>!
