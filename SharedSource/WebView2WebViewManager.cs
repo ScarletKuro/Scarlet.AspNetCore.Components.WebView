@@ -28,7 +28,7 @@ using System.Diagnostics;
 using Microsoft.AspNetCore.Components.WebView.Wpf;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Web.WebView2.Core;
-using WebView2Control = Microsoft.Web.WebView2.Wpf.WebView2CompositionControl;
+using WebView2Control = Microsoft.Web.WebView2.Wpf.WebView2;
 using System.Reflection;
 #endif
 
@@ -157,7 +157,14 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 				return;
 			}
 
-			try
+            // CoreWebView2 is null until WebView2 initialization completes
+            var coreWebView = _webview.CoreWebView2;
+            if (coreWebView is null)
+            {
+                return;
+            }
+            
+            try
 			{
 				_webview.CoreWebView2.PostWebMessageAsString(message);
 			}
@@ -328,7 +335,7 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 			await base.DisposeAsyncCore();
 		}
 
-		private static string? GetWebView2UserDataFolder()
+private static string? GetWebView2UserDataFolder()
 		{
 			if (Assembly.GetEntryAssembly() is { } mainAssembly)
 			{
