@@ -1,5 +1,5 @@
 // Copyright (c) .NET Foundation. All rights reserved.
-// Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
+// Licensed under the MIT license. See LICENSE in the project root for license information.
 
 #if !WEBVIEW2_WINFORMS && !WEBVIEW2_WPF
 #error Must specify which WebView2 is targeted
