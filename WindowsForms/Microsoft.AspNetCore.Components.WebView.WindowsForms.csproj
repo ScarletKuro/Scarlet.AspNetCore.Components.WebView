@@ -21,8 +21,8 @@
 
   <PropertyGroup>
     <IsPackable>true</IsPackable>
-    <PackageId>Microsoft.AspNetCore.Components.WebView.WindowsForms</PackageId>
-    <PackageTags>blazor;webview;aspnet;winforms</PackageTags>
+    <PackageId>Scarlet.AspNetCore.Components.WebView.WindowsForms</PackageId>
+    <PackageTags>blazor;webview;aspnet;winforms;scarletkuro</PackageTags>
     <Description>Build Windows Forms apps with Blazor and WebView2.</Description>
   </PropertyGroup>
 
@@ -36,6 +36,8 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="..\icon.png" Pack="True" PackagePath="" Visible="false" Link="icon.png" />
+    <None Include="..\README.md" Pack="True" PackagePath="" Visible="false" Link="README.md" />
     <Content Remove="build\**\*" />
     <None Include="build\**\*" Pack="True" PackagePath="build\%(RecursiveDir)%(FileName)%(Extension)" />
   </ItemGroup>

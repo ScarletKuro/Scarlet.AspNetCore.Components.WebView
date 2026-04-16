@@ -3,6 +3,18 @@
   <PropertyGroup>
     <LangVersion>latest</LangVersion>
     <ImplicitUsings>enable</ImplicitUsings>
+    <EnableWindowsTargeting Condition="'$(CI)' == 'true'">true</EnableWindowsTargeting>
+    <Authors>ScarletKuro</Authors>
+    <Company>ScarletKuro</Company>
+    <RepositoryUrl>https://github.com/ScarletKuro/Scarlet.AspNetCore.Components.WebView</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>$(RepositoryUrl)</PackageProjectUrl>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageIcon>icon.png</PackageIcon>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,0 +1,50 @@
+name: Publish NuGet packages
+
+on:
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Validate semantic version tag
+        id: version
+        shell: bash
+        run: |
+          version='${{ github.ref_name }}'
+          semver_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+
+          if [[ ! "$version" =~ $semver_pattern ]]; then
+            echo "Tag '$version' is not a valid SemVer 2.0.0 version." >&2
+            exit 1
+          fi
+
+          echo "package_version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Restore
+        run: dotnet restore WebView.slnx
+
+      - name: Build
+        run: dotnet build WebView.slnx --configuration Release --no-restore /p:ContinuousIntegrationBuild=true
+
+      - name: Pack
+        run: |
+          dotnet pack WindowsForms/Microsoft.AspNetCore.Components.WebView.WindowsForms.csproj --configuration Release --no-build --output artifacts /p:PackageVersion=${{ steps.version.outputs.package_version }} /p:Version=${{ steps.version.outputs.package_version }}
+          dotnet pack Wpf/Microsoft.AspNetCore.Components.WebView.Wpf.csproj --configuration Release --no-build --output artifacts /p:PackageVersion=${{ steps.version.outputs.package_version }} /p:Version=${{ steps.version.outputs.package_version }}
+
+      - name: Publish packages to NuGet
+        run: dotnet nuget push "artifacts/*.*nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
