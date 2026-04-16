@@ -47,4 +47,4 @@ jobs:
           dotnet pack Wpf/Microsoft.AspNetCore.Components.WebView.Wpf.csproj --configuration Release --no-build --output artifacts /p:PackageVersion=${{ steps.version.outputs.package_version }} /p:Version=${{ steps.version.outputs.package_version }}
 
       - name: Publish packages to NuGet
-        run: dotnet nuget push "artifacts/*.nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push "artifacts/*.*nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
