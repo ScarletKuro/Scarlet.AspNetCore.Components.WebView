@@ -2,6 +2,7 @@
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
+using System.Collections;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using System.IO;
@@ -303,9 +304,42 @@ namespace Microsoft.AspNetCore.Components.WebView.Wpf
 
 		private WpfDispatcher ComponentsDispatcher { get; }
 
+		/// <inheritdoc />
+		protected override IEnumerator LogicalChildren
+		{
+			get
+			{
+				// Expose RootComponents as logical children so DataContext and other
+				// inheritable dependency properties flow from this control into each
+				// RootComponent's bindings.
+				foreach (var rootComponent in RootComponents)
+				{
+					yield return rootComponent;
+				}
+			}
+		}
+
 		private void HandleRootComponentsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs eventArgs)
 		{
 			CheckDisposed();
+
+			// Keep the logical tree in sync with the collection so inheritable DPs
+			// (DataContext, etc.) propagate correctly to the RootComponent instances.
+			if (eventArgs.OldItems != null)
+			{
+				foreach (RootComponent removed in eventArgs.OldItems)
+				{
+					RemoveLogicalChild(removed);
+				}
+			}
+
+			if (eventArgs.NewItems != null)
+			{
+				foreach (RootComponent added in eventArgs.NewItems)
+				{
+					AddLogicalChild(added);
+				}
+			}
 
 			// If we haven't initialized yet, this is a no-op
 			if (_webviewManager != null)

@@ -13,12 +13,13 @@ namespace Microsoft.AspNetCore.Components.WebView.Wpf
 	/// Describes a root component that can be added to a <see cref="BlazorWebView"/>.
 	/// </summary>
 	/// <remarks>
-	/// Inherits from <see cref="Freezable"/> so that XAML bindings on <see cref="Selector"/>,
-	/// <see cref="ComponentType"/>, and <see cref="Parameters"/> pick up the hosting
-	/// <see cref="BlazorWebView"/>'s <c>DataContext</c> even though items inside
-	/// <see cref="RootComponentsCollection"/> are not part of the logical or visual tree.
+	/// Inherits from <see cref="FrameworkElement"/> so that items added to <see cref="RootComponentsCollection"/>
+	/// can be wired into the hosting <see cref="BlazorWebView"/>'s logical tree. This enables
+	/// <c>DataContext</c> inheritance and makes XAML bindings on <see cref="Selector"/>,
+	/// <see cref="ComponentType"/>, and <see cref="Parameters"/> resolve against the host's DataContext
+	/// without requiring a BindingProxy or explicit <c>ElementName</c>/<c>Source</c>.
 	/// </remarks>
-	public class RootComponent : Freezable
+	public class RootComponent : FrameworkElement
 	{
 		/// <summary>
 		/// Identifies the <see cref="Selector"/> dependency property.
@@ -45,7 +46,9 @@ namespace Microsoft.AspNetCore.Components.WebView.Wpf
 			nameof(Parameters),
 			typeof(IDictionary<string, object?>),
 			typeof(RootComponent),
-			new PropertyMetadata(null));
+			new PropertyMetadata(null, OnParametersChanged));
+
+		private WebViewManager? _attachedManager;
 
 		/// <summary>
 		/// Gets or sets the CSS selector string that specifies where in the document the component should be placed.
@@ -75,10 +78,7 @@ namespace Microsoft.AspNetCore.Components.WebView.Wpf
 			set => SetValue(ParametersProperty, value);
 		}
 
-		/// <inheritdoc />
-		protected override Freezable CreateInstanceCore() => new RootComponent();
-
-		internal Task AddToWebViewManagerAsync(WebViewManager webViewManager)
+		internal async Task AddToWebViewManagerAsync(WebViewManager webViewManager)
 		{
 			// As a characteristic of XAML,we can't rely on non-default constructors. So we have to
 			// validate that the required properties were set. We could skip validating this and allow
@@ -94,13 +94,33 @@ namespace Microsoft.AspNetCore.Components.WebView.Wpf
 				throw new InvalidOperationException($"{nameof(RootComponent)} requires a value for its {nameof(ComponentType)} property, but no value was set.");
 			}
 
+			_attachedManager = webViewManager;
+
 			var parameterView = Parameters == null ? ParameterView.Empty : ParameterView.FromDictionary(Parameters);
-			return webViewManager.AddRootComponentAsync(ComponentType, Selector, parameterView);
+			await webViewManager.AddRootComponentAsync(ComponentType, Selector, parameterView);
 		}
 
 		internal Task RemoveFromWebViewManagerAsync(WebView2WebViewManager webviewManager)
 		{
+			_attachedManager = null;
 			return webviewManager.RemoveRootComponentAsync(Selector);
+		}
+
+		private static async void OnParametersChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+		{
+			// When a binding resolves late (e.g. after DataContext inheritance kicks in), re-seed
+			// the root component with the new parameters. The WebViewManager API does not expose an
+			// in-place parameter update, so we remove and re-add.
+			var self = (RootComponent)d;
+			var manager = self._attachedManager;
+			if (manager is null || string.IsNullOrWhiteSpace(self.Selector) || self.ComponentType is null)
+			{
+				return;
+			}
+
+			var parameterView = self.Parameters == null ? ParameterView.Empty : ParameterView.FromDictionary(self.Parameters);
+			await manager.RemoveRootComponentAsync(self.Selector);
+			await manager.AddRootComponentAsync(self.ComponentType, self.Selector, parameterView);
 		}
 	}
 }
