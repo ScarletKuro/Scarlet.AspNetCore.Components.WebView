@@ -43,8 +43,17 @@ jobs:
 
       - name: Pack
         run: |
-          dotnet pack WindowsForms/Microsoft.AspNetCore.Components.WebView.WindowsForms.csproj --configuration Release --no-build --output artifacts /p:PackageVersion=${{ steps.version.outputs.package_version }} /p:Version=${{ steps.version.outputs.package_version }}
-          dotnet pack Wpf/Microsoft.AspNetCore.Components.WebView.Wpf.csproj --configuration Release --no-build --output artifacts /p:PackageVersion=${{ steps.version.outputs.package_version }} /p:Version=${{ steps.version.outputs.package_version }}
+          dotnet pack WindowsForms/Microsoft.AspNetCore.Components.WebView.WindowsForms.csproj --configuration Release --no-build --output packages /p:PackageVersion=${{ steps.version.outputs.package_version }} /p:Version=${{ steps.version.outputs.package_version }}
+          dotnet pack Wpf/Microsoft.AspNetCore.Components.WebView.Wpf.csproj --configuration Release --no-build --output packages /p:PackageVersion=${{ steps.version.outputs.package_version }} /p:Version=${{ steps.version.outputs.package_version }}
 
-      - name: Publish packages to NuGet
-        run: dotnet nuget push "artifacts/*.*nupkg" --api-key "${{ secrets.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+      - name: Push packages to NuGet
+        run: |
+          dotnet nuget push ./packages/*.nupkg \
+            --api-key "${{ secrets.NUGET_API_KEY }}" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
+
+          dotnet nuget push ./packages/*.snupkg \
+            --api-key "${{ secrets.NUGET_API_KEY }}" \
+            --source https://api.nuget.org/v3/index.json \
+            --skip-duplicate
