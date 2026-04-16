@@ -37,6 +37,7 @@
 
   <ItemGroup>
     <None Include="..\icon.png" Pack="True" PackagePath="" Visible="false" Link="icon.png" />
+    <None Include="..\README.md" Pack="True" PackagePath="" Visible="false" Link="README.md" />
     <Content Remove="build\**\*" />
     <None Include="build\**\*" Pack="True" PackagePath="build\%(RecursiveDir)%(FileName)%(Extension)" />
   </ItemGroup>
