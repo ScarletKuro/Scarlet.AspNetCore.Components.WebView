@@ -30,6 +30,16 @@ namespace Microsoft.AspNetCore.Components.WebView
 		/// Gets or sets the environment options for the <see cref="WebView2Control"/>.
 		/// </summary>
 		public CoreWebView2EnvironmentOptions EnvironmentOptions { get; set; }
+
+		/// <summary>
+		/// Gets or sets a pre-created <see cref="CoreWebView2Environment"/> for the <see cref="WebView2Control"/>.
+		/// When set, the BlazorWebView reuses this environment instead of creating a new one, and
+		/// <see cref="BrowserExecutableFolder"/>, <see cref="UserDataFolder"/> and <see cref="EnvironmentOptions"/>
+		/// are ignored. This value also takes precedence over any shared environment registered via
+		/// dependency injection (see <c>UseSharedCoreWebView2Environment</c>).
+		/// The caller owns the environment's lifetime; the BlazorWebView will not dispose it.
+		/// </summary>
+		public CoreWebView2Environment CoreWebView2Environment { get; set; }
 #endif
 	}
 }

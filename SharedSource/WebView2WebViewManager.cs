@@ -62,6 +62,7 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 		private readonly Action<BlazorWebViewInitializingEventArgs> _blazorWebViewInitializing;
 		private readonly Action<BlazorWebViewInitializedEventArgs> _blazorWebViewInitialized;
 		private readonly BlazorWebViewDeveloperTools _developerTools;
+		private readonly IServiceProvider _services;
 
 		/// <summary>
 		/// Constructs an instance of <see cref="WebView2WebViewManager"/>.
@@ -116,6 +117,7 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 			_blazorWebViewInitializing = blazorWebViewInitializing;
 			_blazorWebViewInitialized = blazorWebViewInitialized;
 			_developerTools = services.GetRequiredService<BlazorWebViewDeveloperTools>();
+			_services = services;
 			_contentRootRelativeToAppRoot = contentRootRelativeToAppRoot;
 
 			// Unfortunately the CoreWebView2 can only be instantiated asynchronously.
@@ -179,12 +181,30 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 		{
 			var args = new BlazorWebViewInitializingEventArgs();
 			_blazorWebViewInitializing?.Invoke(args);
-			var userDataFolder = args.UserDataFolder ?? GetWebView2UserDataFolder();
-			_coreWebView2Environment = await CoreWebView2Environment.CreateAsync(
-				browserExecutableFolder: args.BrowserExecutableFolder,
-				userDataFolder: userDataFolder,
-				options: args.EnvironmentOptions)
-			.ConfigureAwait(true);
+
+			// Precedence:
+			//   1. Explicit environment on the initializing event args (per-view override).
+			//   2. Shared environment registered via ICoreWebView2EnvironmentProvider in DI.
+			//   3. Create a new environment using the args' folder/options (legacy path).
+			if (args.CoreWebView2Environment is not null)
+			{
+				_coreWebView2Environment = args.CoreWebView2Environment;
+			}
+			else if (_services.GetService<ICoreWebView2EnvironmentProvider>() is { } sharedProvider)
+			{
+				_coreWebView2Environment = await sharedProvider
+					.GetEnvironmentAsync()
+					.ConfigureAwait(true);
+			}
+			else
+			{
+				var userDataFolder = args.UserDataFolder ?? GetWebView2UserDataFolder();
+				_coreWebView2Environment = await CoreWebView2Environment.CreateAsync(
+					browserExecutableFolder: args.BrowserExecutableFolder,
+					userDataFolder: userDataFolder,
+					options: args.EnvironmentOptions)
+				.ConfigureAwait(true);
+			}
 
 			_logger.StartingWebView2();
 			await _webview.EnsureCoreWebView2Async(_coreWebView2Environment);
