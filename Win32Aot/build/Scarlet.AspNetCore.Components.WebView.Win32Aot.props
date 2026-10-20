@@ -1,0 +1,13 @@
+﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <PropertyGroup>
+    <!--
+      PublishAot/PublishTrimmed turn off reflection-based System.Text.Json by default, but Blazor's WebView IPC
+      (Microsoft.AspNetCore.Components.WebView IpcCommon) still serializes its messages through reflection.
+      Keep it enabled, as the Blazor WebAssembly SDK does. Set the property to false explicitly once Blazor
+      ships a source-generated IPC path.
+    -->
+    <JsonSerializerIsReflectionEnabledByDefault Condition="'$(JsonSerializerIsReflectionEnabledByDefault)' == ''">true</JsonSerializerIsReflectionEnabledByDefault>
+  </PropertyGroup>
+
+</Project>
