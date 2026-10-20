@@ -56,6 +56,8 @@ jobs:
       - name: Verify publish output
         shell: pwsh
         run: |
-          foreach ($file in 'Win32Aot.BlazorApp.exe', 'WebView2Loader.dll', 'wwwroot/index.html', 'wwwroot/_framework/blazor.webview.js') {
+          # The example uses a ProjectReference, so WebView2Loader.dll is copied under runtimes\win-<arch>\native
+          # (probed by WebView2Utilities.Initialize). NuGet consumers get it next to the exe instead.
+          foreach ($file in 'Win32Aot.BlazorApp.exe', 'runtimes/win-x64/native/WebView2Loader.dll', 'wwwroot/index.html', 'wwwroot/_framework/blazor.webview.js') {
             if (-not (Test-Path "artifacts/win32aot-example/$file")) { Write-Host "::error::Missing $file"; exit 1 }
           }
