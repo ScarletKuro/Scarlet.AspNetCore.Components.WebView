@@ -93,8 +93,7 @@ The package's `build/` props and targets apply defaults that make a Blazor app w
 | Default | Why |
 | --- | --- |
 | `JsonSerializerIsReflectionEnabledByDefault=true` | Blazor WebView IPC and JS interop serialize through reflection (same default as the Blazor WebAssembly SDK). |
-| `TrimMode=partial` | Razor components are created and get parameters through reflection, and Razor-generated code passes component types (layouts, `NotFoundPage`, ...) in ways the trimmer can't follow. Only assemblies marked `IsTrimmable` (the framework) are trimmed. |
-| DirectN / DirectN.Extensions trimmed anyway | They are built with `IsAotCompatible` but `GenerateAssemblyInfo=false`, so the `IsTrimmable` attribute is missing from the binaries. Without this, partial mode would keep tens of MB of DirectX interop. Opt out with `ScarletBlazorWebViewKeepDirectN=true`. |
+| `TrimMode=partial` | Razor components are created and get parameters through reflection, and Razor-generated code passes component types (layouts, `NotFoundPage`, ...) in ways the trimmer can't follow. Only assemblies marked `IsTrimmable` are trimmed: the framework, WebView2Aot and DirectN (the package requires DirectNAot 1.7.1+, the first version marked trimmable). |
 | `rd.xml` runtime directives | Roots the generic System.Text.Json converters (over `JsonElement` and Blazor's enums) that Blazor's IPC needs at runtime. Opt out with `ScarletBlazorWebViewDisableRdXml=true`. |
 
 The example publishes to a single ~10 MB native executable plus `WebView2Loader.dll` and `wwwroot`.

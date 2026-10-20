@@ -23,6 +23,10 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView" Version="10.0.*" />
     <PackageReference Include="WebView2Aot" Version="1.6.2" />
+    <!-- WebView2Aot 1.6.2 allows DirectNAot >= 1.7.0, and NuGet would pick 1.7.0. 1.7.1 is the first release whose
+         assemblies carry IsTrimmable/IsAotCompatible, so trimming treats them like the framework. -->
+    <PackageReference Include="DirectNAot" Version="1.7.1" />
+    <PackageReference Include="DirectNAot.Extensions" Version="1.7.1" />
     <!-- Only used to redistribute the native WebView2Loader.dll; no managed assets flow to consumers. -->
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.*" GeneratePathProperty="true" ExcludeAssets="all" PrivateAssets="all" />
   </ItemGroup>
