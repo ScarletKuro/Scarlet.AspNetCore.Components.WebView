@@ -10,6 +10,7 @@
     <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
     <!-- Enables the trim, AOT and single-file analyzers. The library itself must stay warning free. -->
     <IsAotCompatible>true</IsAotCompatible>
+    <WarningsAsErrors>$(WarningsAsErrors);IL2026;IL2046;IL2057;IL2060;IL2067;IL2070;IL2072;IL2075;IL2080;IL2087;IL2090;IL2091;IL2092;IL2093;IL2111;IL3000;IL3001;IL3002;IL3050;IL3051</WarningsAsErrors>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -38,16 +39,14 @@
 
   <!--
     WebView2Loader.dll is redistributed from the Microsoft.Web.WebView2 package.
-    None items are packed as NuGet native runtime assets for package consumers. Content items are copied to the output
-    of ProjectReference consumers (WebView2Utilities.Initialize probes <app dir> and <app dir>\runtimes\win-<arch>\native).
+    Each file is packed as a NuGet native runtime asset for package consumers, and copied to the output of
+    ProjectReference consumers (WebView2Utilities.Initialize probes <app dir> and <app dir>\runtimes\win-<arch>\native).
+    One item per file: pack de-duplicates by source path, so a second item for the same file would shadow this one.
   -->
   <ItemGroup Condition="'$(PkgMicrosoft_Web_WebView2)' != ''">
-    <None Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x64\native\WebView2Loader.dll" Pack="true" PackagePath="runtimes\win-x64\native\" Visible="false" />
-    <None Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x86\native\WebView2Loader.dll" Pack="true" PackagePath="runtimes\win-x86\native\" Visible="false" />
-    <None Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-arm64\native\WebView2Loader.dll" Pack="true" PackagePath="runtimes\win-arm64\native\" Visible="false" />
-    <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x64\native\WebView2Loader.dll" Link="runtimes\win-x64\native\WebView2Loader.dll" CopyToOutputDirectory="PreserveNewest" Pack="false" Visible="false" />
-    <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x86\native\WebView2Loader.dll" Link="runtimes\win-x86\native\WebView2Loader.dll" CopyToOutputDirectory="PreserveNewest" Pack="false" Visible="false" />
-    <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-arm64\native\WebView2Loader.dll" Link="runtimes\win-arm64\native\WebView2Loader.dll" CopyToOutputDirectory="PreserveNewest" Pack="false" Visible="false" />
+    <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x64\native\WebView2Loader.dll" Link="runtimes\win-x64\native\WebView2Loader.dll" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="runtimes\win-x64\native\" Visible="false" />
+    <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x86\native\WebView2Loader.dll" Link="runtimes\win-x86\native\WebView2Loader.dll" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="runtimes\win-x86\native\" Visible="false" />
+    <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-arm64\native\WebView2Loader.dll" Link="runtimes\win-arm64\native\WebView2Loader.dll" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="runtimes\win-arm64\native\" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>

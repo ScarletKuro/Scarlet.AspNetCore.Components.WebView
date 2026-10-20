@@ -6,6 +6,28 @@
     <CoreCompileDependsOn Condition="'$(PublishProtocol)' == 'ClickOnce' or '$(PublishProtocol)' == 'FileSystem'">$(CoreCompileDependsOn);StaticWebAssetsPrepareForRun</CoreCompileDependsOn>
   </PropertyGroup>
 
+  <!-- Roots generic instantiations that Blazor's reflection-based JSON serialization needs under NativeAOT. -->
+  <ItemGroup Condition="'$(PublishAot)' == 'true' and '$(ScarletBlazorWebViewDisableRdXml)' != 'true'">
+    <RdXmlFile Include="$(MSBuildThisFileDirectory)Scarlet.AspNetCore.Components.WebView.Win32Aot.rd.xml" />
+  </ItemGroup>
+
+  <!--
+    DirectN (pulled in by WebView2Aot) is built with IsAotCompatible (which implies IsTrimmable), but also with
+    GenerateAssemblyInfo=false, which drops the generated [AssemblyMetadata("IsTrimmable", "True")] from the binaries
+    (checked on DirectNAot 1.7.0). The trimmer/ILC decides from that attribute, so partial trim mode would keep all of
+    DirectN's DirectX interop (tens of MB). Trim it like the framework assemblies.
+  -->
+  <Target Name="_ScarletTrimDirectN"
+          AfterTargets="PrepareForILLink"
+          BeforeTargets="WriteIlcRspFileForCompilation;ILLink"
+          Condition="'$(ScarletBlazorWebViewKeepDirectN)' != 'true'">
+    <ItemGroup>
+      <ManagedAssemblyToLink Condition="'%(Filename)' == 'DirectN' or '%(Filename)' == 'DirectN.Extensions'">
+        <TrimMode>link</TrimMode>
+      </ManagedAssemblyToLink>
+    </ItemGroup>
+  </Target>
+
   <Target Name="AddStaticWebAssetsForClickOnce" AfterTargets="ComputeFilesToPublish" Condition="'$(PublishProtocol)' == 'ClickOnce'">
     <ComputeStaticWebAssetsTargetPaths Assets="@(StaticWebAsset)" PathPrefix="wwwroot">
       <Output TaskParameter="AssetsWithTargetPath" ItemName="_ClickOnceAssetCandidate" />
@@ -24,4 +46,4 @@
     </ItemGroup>
   </Target>
 
-</Project> 
+</Project>

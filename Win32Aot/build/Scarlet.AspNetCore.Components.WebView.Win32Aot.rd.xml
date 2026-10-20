@@ -1,0 +1,28 @@
+<!--
+  NativeAOT runtime directives for Blazor WebView.
+
+  Blazor's WebView IPC and JS interop still use reflection-based System.Text.Json (see the IL3050 warnings from
+  Microsoft.AspNetCore.Components.WebView / Microsoft.JSInterop). Under NativeAOT, System.Text.Json creates its
+  converters for collection types through MakeGenericType, and those generic instantiations are not compiled unless
+  something roots them. This file roots the instantiations Blazor itself needs.
+
+  Remove once Blazor ships source-generated IPC serialization.
+-->
+<Directives xmlns="http://schemas.microsoft.com/netfx/2013/01/metadata">
+  <Application>
+    <Assembly Name="System.Text.Json">
+      <!-- IpcCommon.TryDeserialize: incoming IPC messages are JsonElement[] -->
+      <Type Name="System.Text.Json.Serialization.Converters.ArrayConverter`2[[System.Text.Json.JsonElement[],System.Text.Json],[System.Text.Json.JsonElement,System.Text.Json]]" Dynamic="Required All" />
+      <!-- IpcCommon.Serialize: outgoing IPC messages are IEnumerable<object> -->
+      <Type Name="System.Text.Json.Serialization.Converters.IEnumerableOfTConverter`2[[System.Collections.Generic.IEnumerable`1[[System.Object,System.Private.CoreLib]],System.Private.CoreLib],[System.Object,System.Private.CoreLib]]" Dynamic="Required All" />
+      <!-- JSRuntime.InvokeAsync / WebRenderer interop: arguments are object[] -->
+      <Type Name="System.Text.Json.Serialization.Converters.ArrayConverter`2[[System.Object[],System.Private.CoreLib],[System.Object,System.Private.CoreLib]]" Dynamic="Required All" />
+      <!-- Enums sent as IPC / JS interop arguments (IpcSender.BeginInvokeJS, WebRenderer attach, message types) -->
+      <Type Name="System.Text.Json.Serialization.Converters.EnumConverter`1[[Microsoft.JSInterop.JSCallResultType,Microsoft.JSInterop]]" Dynamic="Required All" />
+      <Type Name="System.Text.Json.Serialization.Converters.EnumConverter`1[[Microsoft.JSInterop.Infrastructure.JSCallType,Microsoft.JSInterop]]" Dynamic="Required All" />
+      <Type Name="System.Text.Json.Serialization.Converters.EnumConverter`1[[Microsoft.AspNetCore.Components.WebRendererId,Microsoft.AspNetCore.Components.WebView]]" Dynamic="Required All" />
+      <Type Name="System.Text.Json.Serialization.Converters.EnumConverter`1[[Microsoft.AspNetCore.Components.WebView.IpcCommon+IncomingMessageType,Microsoft.AspNetCore.Components.WebView]]" Dynamic="Required All" />
+      <Type Name="System.Text.Json.Serialization.Converters.EnumConverter`1[[Microsoft.AspNetCore.Components.WebView.IpcCommon+OutgoingMessageType,Microsoft.AspNetCore.Components.WebView]]" Dynamic="Required All" />
+    </Assembly>
+  </Application>
+</Directives>

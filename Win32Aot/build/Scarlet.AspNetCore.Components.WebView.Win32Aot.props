@@ -1,13 +1,23 @@
 ﻿<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
 
+  <!--
+    Defaults that make Blazor work when the app is trimmed or published with NativeAOT. Blazor itself is not yet
+    trim/AOT clean; each default can be overridden in the project file.
+  -->
   <PropertyGroup>
     <!--
       PublishAot/PublishTrimmed turn off reflection-based System.Text.Json by default, but Blazor's WebView IPC
-      (Microsoft.AspNetCore.Components.WebView IpcCommon) still serializes its messages through reflection.
-      Keep it enabled, as the Blazor WebAssembly SDK does. Set the property to false explicitly once Blazor
-      ships a source-generated IPC path.
+      (Microsoft.AspNetCore.Components.WebView IpcCommon) and JS interop still serialize through reflection.
+      Keep it enabled, as the Blazor WebAssembly SDK does.
     -->
     <JsonSerializerIsReflectionEnabledByDefault Condition="'$(JsonSerializerIsReflectionEnabledByDefault)' == ''">true</JsonSerializerIsReflectionEnabledByDefault>
+
+    <!--
+      Razor components are activated and receive parameters through reflection, and Razor-generated code passes
+      component types (layouts, NotFoundPage, DynamicComponent, ...) in ways the trimmer can't follow. Only trim
+      assemblies that opt in with IsTrimmable (the framework); the app and Razor class libraries are kept whole.
+    -->
+    <TrimMode Condition="'$(TrimMode)' == ''">partial</TrimMode>
   </PropertyGroup>
 
 </Project>
