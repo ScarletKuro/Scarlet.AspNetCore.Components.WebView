@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - '**'
+  # Called by publish-nuget.yml so a release only goes out when every job here passes.
+  workflow_call:
 
 permissions:
   contents: read
