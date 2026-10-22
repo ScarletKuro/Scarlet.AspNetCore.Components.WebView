@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!-- A NuGet consumer gets these imports automatically from the package's build folder. -->
+  <Import Project="..\..\Wpf\build\Scarlet.AspNetCore.Components.WebView.Wpf.props" />
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Wpf.BlazorApp</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Wpf\Microsoft.AspNetCore.Components.WebView.Wpf.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="9.0.*" />
+  </ItemGroup>
+
+  <Import Project="..\..\Wpf\build\Scarlet.AspNetCore.Components.WebView.Wpf.targets" />
+
+</Project>

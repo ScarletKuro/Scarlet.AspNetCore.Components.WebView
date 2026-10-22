@@ -8,7 +8,7 @@ using DirectN.Extensions.Utilities;
 using Microsoft.AspNetCore.Components.WebView.Win32Aot;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Win32Aot.LifetimeTests.Components;
+using LifetimeTests.Components;
 using Functions = DirectN.Functions;
 using HWND = DirectN.HWND;
 using PEEK_MESSAGE_REMOVE_TYPE = DirectN.PEEK_MESSAGE_REMOVE_TYPE;

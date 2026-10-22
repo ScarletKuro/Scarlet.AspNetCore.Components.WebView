@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!-- A NuGet consumer gets these imports automatically from the package's build folder. -->
+  <Import Project="..\..\Wpf\build\Scarlet.AspNetCore.Components.WebView.Wpf.props" />
+
+  <PropertyGroup>
+    <!-- Console app so the scenario report is visible; the windows are still WPF windows. -->
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Wpf.LifetimeTests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Wpf\Microsoft.AspNetCore.Components.WebView.Wpf.csproj" />
+    <ProjectReference Include="..\LifetimeTests.Components\LifetimeTests.Components.csproj" />
+  </ItemGroup>
+
+  <Import Project="..\..\Wpf\build\Scarlet.AspNetCore.Components.WebView.Wpf.targets" />
+
+</Project>

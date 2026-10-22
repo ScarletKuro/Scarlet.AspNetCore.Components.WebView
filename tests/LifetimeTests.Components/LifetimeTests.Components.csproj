@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!-- Razor components and the scenario runner shared by the WindowsForms, Wpf and Win32Aot lifetime tests. -->
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.Web" Version="9.0.*" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.*" />
+  </ItemGroup>
+
+</Project>

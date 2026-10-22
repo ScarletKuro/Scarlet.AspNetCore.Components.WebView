@@ -1,0 +1,36 @@
+@page "/errors"
+@inject IJSRuntime JS
+
+<h1>Errors</h1>
+
+<p>
+    Exceptions in event handlers are caught by the layout's <code>ErrorBoundary</code>.
+    Exceptions outside the renderer reach <code>Application.DispatcherUnhandledException</code>; this sample
+    shows them in a message box and keeps running.
+</p>
+
+<button class="btn" @onclick="ThrowInHandler">Throw in an event handler</button>
+<button class="btn" @onclick="ThrowInJs">Throw in JavaScript</button>
+
+@if (_jsError is not null)
+{
+    <p role="status">Caught JS error: @_jsError</p>
+}
+
+@code {
+    private string? _jsError;
+
+    private void ThrowInHandler() => throw new InvalidOperationException("Thrown from a Razor event handler.");
+
+    private async Task ThrowInJs()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("interopSample.fail");
+        }
+        catch (JSException ex)
+        {
+            _jsError = ex.Message;
+        }
+    }
+}

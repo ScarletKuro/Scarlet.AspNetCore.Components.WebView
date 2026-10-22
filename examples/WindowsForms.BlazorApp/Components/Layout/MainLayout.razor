@@ -1,0 +1,32 @@
+@inherits LayoutComponentBase
+
+<div class="page">
+    <nav class="sidebar">
+        <div class="brand">WindowsForms.BlazorApp</div>
+        <NavLink class="nav-link" href="" Match="NavLinkMatch.All">Home</NavLink>
+        <NavLink class="nav-link" href="counter">Counter</NavLink>
+        <NavLink class="nav-link" href="interop">JS interop</NavLink>
+        <NavLink class="nav-link" href="links">Links</NavLink>
+        <NavLink class="nav-link" href="errors">Errors</NavLink>
+        <NavLink class="nav-link" href="background">Background work</NavLink>
+    </nav>
+
+    <main>
+        <ErrorBoundary @ref="_errorBoundary">
+            <ChildContent>
+                @Body
+            </ChildContent>
+            <ErrorContent Context="exception">
+                <div class="error-boundary">
+                    <h2>Something went wrong</h2>
+                    <pre>@exception.Message</pre>
+                    <button class="btn" @onclick="() => _errorBoundary?.Recover()">Recover</button>
+                </div>
+            </ErrorContent>
+        </ErrorBoundary>
+    </main>
+</div>
+
+@code {
+    private ErrorBoundary? _errorBoundary;
+}

@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\Win32Aot\Microsoft.AspNetCore.Components.WebView.Win32Aot.csproj" />
+    <ProjectReference Include="..\LifetimeTests.Components\LifetimeTests.Components.csproj" />
   </ItemGroup>
 
   <Import Project="..\..\Win32Aot\build\Scarlet.AspNetCore.Components.WebView.Win32Aot.targets" />

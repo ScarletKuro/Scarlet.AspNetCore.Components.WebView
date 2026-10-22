@@ -117,6 +117,20 @@ What remains your responsibility, as in any AOT app:
 - **Two copies of `WebView2Loader.dll`.** RID-less builds place it under `runtimes\win-<arch>\native\`, and RID-specific
   publishes put it next to the exe. Both locations are probed.
 
+## Examples and tests
+
+Each host has an example app with the same pages: `examples/WindowsForms.BlazorApp`, `examples/Wpf.BlazorApp` and
+`examples/Win32Aot.BlazorApp` (published with NativeAOT).
+
+CI runs, for each host, on a Windows runner with real windows:
+
+- `tests/<Host>.LifetimeTests`: windows closed, destroyed or never disposed while a component keeps working in the
+  background and then calls `InvokeAsync`/`DispatchExceptionAsync`
+  ([dotnet/maui#34855](https://github.com/dotnet/maui/issues/34855)). No exception may reach the app's unhandled
+  exception handler. Win32Aot runs them both with the JIT and as a NativeAOT executable.
+- `tests/ui/Test-BlazorApp.ps1`: drives the published example through UI Automation (pages, clicks, JS interop, the
+  background work page, clean exit).
+
 ## Repository
 
 Source and issue tracking: https://github.com/ScarletKuro/Scarlet.AspNetCore.Components.WebView

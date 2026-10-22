@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!-- A NuGet consumer gets these imports automatically from the package's build folder. -->
+  <Import Project="..\..\WindowsForms\build\Scarlet.AspNetCore.Components.WebView.WindowsForms.props" />
+
+  <PropertyGroup>
+    <!-- Console app so the scenario report is visible; the windows are still Windows Forms forms. -->
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <RootNamespace>WindowsForms.LifetimeTests</RootNamespace>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\WindowsForms\Microsoft.AspNetCore.Components.WebView.WindowsForms.csproj" />
+    <ProjectReference Include="..\LifetimeTests.Components\LifetimeTests.Components.csproj" />
+  </ItemGroup>
+
+  <Import Project="..\..\WindowsForms\build\Scarlet.AspNetCore.Components.WebView.WindowsForms.targets" />
+
+</Project>

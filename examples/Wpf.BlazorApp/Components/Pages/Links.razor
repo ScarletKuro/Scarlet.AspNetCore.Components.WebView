@@ -1,0 +1,12 @@
+@page "/links"
+
+<h1>Links</h1>
+
+<p>How <code>BlazorWebView</code> routes navigation (see the <code>UrlLoading</code> handler in <code>MainWindow.xaml.cs</code>):</p>
+
+<ul class="links">
+    <li><a href="counter">Internal link</a>: stays in the WebView and is handled by the Blazor router.</li>
+    <li><a href="https://learn.microsoft.com/aspnet/core/blazor/hybrid/">External link</a>: opens in the default browser.</li>
+    <li><a href="https://learn.microsoft.com/microsoft-edge/webview2/" target="_blank">target="_blank" link</a>: always opens in the default browser.</li>
+    <li><a href="file:///C:/Windows/win.ini">file:// link</a>: cancelled by the sample's <code>UrlLoading</code> policy.</li>
+</ul>
