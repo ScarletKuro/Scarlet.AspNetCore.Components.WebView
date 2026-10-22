@@ -29,6 +29,7 @@ internal static class Program
 #endif
 		services.AddSingleton<HostEvents>();
 		services.AddSingleton<NativeDialogs>();
+		services.AddSingleton<BackgroundWorkWindows>();
 
 		using var serviceProvider = services.BuildServiceProvider();
 

@@ -32,6 +32,7 @@ Publishing prints trim/AOT warnings from Blazor's own assemblies. These are expe
 | JS interop | .NET → JS with a source-generated `JsonSerializerContext`, JS → .NET with `[JSInvokable]`, and a component calling Win32 (`MessageBoxW`) through `[LibraryImport]`. |
 | Links | `UrlLoading`: internal links stay in the view, external and `target="_blank"` links open in the browser, `file://` links are cancelled by the sample's policy. |
 | Errors | `ErrorBoundary` for handler exceptions, `JSException` from JavaScript, and `BlazorWebView.UnhandledException` for everything else. |
+| Background work | Extra windows whose component keeps working after the window is closed, then calls `InvokeAsync(StateHasChanged)` / `DispatchExceptionAsync` on the gone view ([dotnet/maui#34855](https://github.com/dotnet/maui/issues/34855)). The app must keep running with no error dialog. |
 
 The project consumes the library through a `ProjectReference`, so it imports the package's `build/` props and targets
 explicitly. A NuGet consumer gets them automatically.

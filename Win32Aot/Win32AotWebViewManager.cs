@@ -9,6 +9,7 @@ using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
+using HRESULT = DirectN.HRESULT;
 using HWND = DirectN.HWND;
 using DirectN.Extensions.Com;
 using DirectN.Extensions.Utilities;
@@ -55,6 +56,10 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 
 		private static readonly Lock LoaderLock = new();
 
+		// HRESULT_FROM_WIN32(ERROR_INVALID_STATE): returned by WebView2 calls once the WebView has been closed,
+		// e.g. because its parent window was destroyed without the BlazorWebView being disposed.
+		private const int WebViewClosedHResult = unchecked((int)0x8007139F);
+
 		private readonly ILogger _logger;
 		private readonly nint _parentWindow;
 		private readonly Task<bool> _webviewReadyTask;
@@ -65,6 +70,7 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 		private readonly BlazorWebViewDeveloperTools _developerTools;
 		private readonly IServiceProvider _services;
 		private volatile bool _isDisposed;
+		private volatile bool _isWebViewClosed;
 
 		private IComObject<ICoreWebView2Environment>? _environment;
 		private bool _ownsEnvironment;
@@ -163,10 +169,10 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 					return;
 				}
 
-				if (isWebviewInitialized && !_isDisposed && _webView is { } webView)
+				if (isWebviewInitialized && !_isDisposed && !_isWebViewClosed && _webView is { } webView)
 				{
 					_logger.NavigatingToUri(absoluteUri);
-					webView.Navigate(absoluteUri.AbsoluteUri);
+					ThrowUnlessWebViewClosed(webView.Navigate(absoluteUri.AbsoluteUri, throwOnError: false));
 				}
 			});
 		}
@@ -174,7 +180,7 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 		/// <inheritdoc />
 		protected override void SendMessage(string message)
 		{
-			if (_isDisposed)
+			if (_isDisposed || _isWebViewClosed)
 			{
 				return;
 			}
@@ -188,13 +194,26 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 
 			try
 			{
-				webView.PostWebMessageAsString(message);
+				ThrowUnlessWebViewClosed(webView.PostWebMessageAsString(message, throwOnError: false));
 			}
 			catch (ObjectDisposedException)
 			{
 				// The WebView2 has been torn down (e.g. the host window was closed)
 				// while an in-flight message was still pending. This is expected and safe to ignore.
 			}
+		}
+
+		// Once the WebView is closed (its parent window is gone) every further call fails; there is nobody left to
+		// receive messages, so they are dropped instead of surfacing as unhandled exceptions (see dotnet/maui#34855).
+		private void ThrowUnlessWebViewClosed(HRESULT hr)
+		{
+			if (hr.Value == WebViewClosedHResult)
+			{
+				_isWebViewClosed = true;
+				return;
+			}
+
+			hr.ThrowOnError();
 		}
 
 		private async Task<bool> TryInitializeWebView2()
