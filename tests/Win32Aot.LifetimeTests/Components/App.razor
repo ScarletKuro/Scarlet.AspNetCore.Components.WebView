@@ -1,0 +1,15 @@
+@* Same shape as https://github.com/ScarletKuro/WpfIssueThreading: DispatchExceptionAsync needs an ErrorBoundary. *@
+<ErrorBoundary>
+    <ChildContent>
+        <BackgroundWork ThrowException="ThrowException" Delay="Delay" />
+    </ChildContent>
+    <ErrorContent>
+        <p class="errorUI">A rotten gremlin got us. Sorry!</p>
+    </ErrorContent>
+</ErrorBoundary>
+
+@code {
+    [Parameter] public bool ThrowException { get; set; }
+
+    [Parameter] public int Delay { get; set; }
+}

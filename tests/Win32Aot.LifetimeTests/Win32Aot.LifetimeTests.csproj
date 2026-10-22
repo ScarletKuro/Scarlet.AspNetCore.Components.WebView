@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!-- A NuGet consumer gets these imports automatically from the package's build folder. -->
+  <Import Project="..\..\Win32Aot\build\Scarlet.AspNetCore.Components.WebView.Win32Aot.props" />
+
+  <PropertyGroup>
+    <!-- Console app so the scenario report is visible; the windows are still plain Win32 windows. -->
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Win32Aot.LifetimeTests</RootNamespace>
+    <IsPackable>false</IsPackable>
+
+    <!-- CI runs the scenarios both with the JIT and as a NativeAOT executable. -->
+    <PublishAot>true</PublishAot>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Win32Aot\Microsoft.AspNetCore.Components.WebView.Win32Aot.csproj" />
+  </ItemGroup>
+
+  <Import Project="..\..\Win32Aot\build\Scarlet.AspNetCore.Components.WebView.Win32Aot.targets" />
+
+</Project>

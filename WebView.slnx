@@ -11,4 +11,7 @@
   <Folder Name="/examples/">
     <Project Path="examples/Win32Aot.BlazorApp/Win32Aot.BlazorApp.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Win32Aot.LifetimeTests/Win32Aot.LifetimeTests.csproj" />
+  </Folder>
 </Solution>

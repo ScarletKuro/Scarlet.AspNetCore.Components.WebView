@@ -61,3 +61,39 @@ jobs:
           foreach ($file in 'Win32Aot.BlazorApp.exe', 'runtimes/win-x64/native/WebView2Loader.dll', 'wwwroot/index.html', 'wwwroot/_framework/blazor.webview.js') {
             if (-not (Test-Path "artifacts/win32aot-example/$file")) { Write-Host "::error::Missing $file"; exit 1 }
           }
+
+      # The hosted Windows runner has an interactive desktop and the WebView2 Runtime, so the tests open real windows.
+      # Lifetime scenarios from dotnet/maui#34855 (windows closed while components keep working); exit code 0 = all pass.
+      - name: Lifetime tests (JIT)
+        shell: pwsh
+        timeout-minutes: 10
+        run: dotnet run --project tests/Win32Aot.LifetimeTests/Win32Aot.LifetimeTests.csproj -c Release
+
+      - name: Lifetime tests (NativeAOT)
+        shell: pwsh
+        timeout-minutes: 15
+        run: |
+          dotnet publish tests/Win32Aot.LifetimeTests/Win32Aot.LifetimeTests.csproj -c Release -r win-x64 -o artifacts/win32aot-lifetime-tests
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          artifacts/win32aot-lifetime-tests/Win32Aot.LifetimeTests.exe
+
+      # Drives the published example through UI Automation. UIAutomationClient needs Windows PowerShell.
+      # UI timing on shared runners can be flaky, so one retry is allowed.
+      - name: UI smoke test of the NativeAOT example
+        shell: powershell
+        timeout-minutes: 10
+        run: |
+          foreach ($attempt in 1, 2) {
+            powershell -NoProfile -ExecutionPolicy Bypass -File tests/ui/Test-BlazorApp.ps1 -Exe artifacts/win32aot-example/Win32Aot.BlazorApp.exe -OutDir "artifacts/ui-test/attempt-$attempt" -ExpectNativeAot
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            Write-Host "::warning::UI smoke test attempt $attempt failed"
+          }
+          exit 1
+
+      - name: Upload UI test screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: win32aot-ui-test-screenshots
+          path: artifacts/ui-test/
+          if-no-files-found: ignore
