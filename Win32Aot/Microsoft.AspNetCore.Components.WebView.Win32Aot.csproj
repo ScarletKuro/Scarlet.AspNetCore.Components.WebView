@@ -1,0 +1,63 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <SupportedOSPlatformVersion>7.0</SupportedOSPlatformVersion>
+    <DefineConstants>$(DefineConstants);WEBVIEW2_WIN32AOT</DefineConstants>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <WarningsAsErrors>$(WarningsAsErrors);CS1591</WarningsAsErrors>
+    <!-- Enables the trim, AOT and single-file analyzers. The library itself must stay warning free. -->
+    <IsAotCompatible>true</IsAotCompatible>
+    <WarningsAsErrors>$(WarningsAsErrors);IL2026;IL2046;IL2057;IL2060;IL2067;IL2070;IL2072;IL2075;IL2080;IL2087;IL2090;IL2091;IL2092;IL2093;IL2111;IL3000;IL3001;IL3002;IL3050;IL3051</WarningsAsErrors>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <IsPackable>true</IsPackable>
+    <PackageId>Scarlet.AspNetCore.Components.WebView.Win32Aot</PackageId>
+    <PackageTags>blazor;webview;webview2;aspnet;win32;aot;nativeaot;scarletkuro</PackageTags>
+    <Description>Build native Win32 apps with Blazor and WebView2, NativeAOT and trimming friendly. Built on WebView2Aot (no WinForms/WPF, no built-in COM).</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebView" Version="10.0.*" />
+    <PackageReference Include="WebView2Aot" Version="1.6.2" />
+    <!-- WebView2Aot 1.6.2 allows DirectNAot >= 1.7.0, and NuGet would pick 1.7.0. 1.7.1 is the first release whose
+         assemblies carry IsTrimmable/IsAotCompatible, so trimming treats them like the framework. -->
+    <PackageReference Include="DirectNAot" Version="1.7.1" />
+    <PackageReference Include="DirectNAot.Extensions" Version="1.7.1" />
+    <!-- Only used to redistribute the native WebView2Loader.dll; no managed assets flow to consumers. -->
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.*" GeneratePathProperty="true" ExcludeAssets="all" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\SharedSource\AutoCloseOnReadCompleteStream.cs" Link="SharedSource\AutoCloseOnReadCompleteStream.cs" />
+    <Compile Include="..\SharedSource\HostAddressHelper.cs" Link="SharedSource\HostAddressHelper.cs" />
+    <Compile Include="..\SharedSource\Log.cs" Link="SharedSource\Log.cs" />
+    <Compile Include="..\SharedSource\QueryStringHelper.cs" Link="SharedSource\QueryStringHelper.cs" />
+    <Compile Include="..\SharedSource\StaticContentHotReloadManager.cs" Link="SharedSource\StaticContentHotReloadManager.cs" />
+    <Compile Include="..\SharedSource\UrlLoadingEventArgs.cs" Link="SharedSource\UrlLoadingEventArgs.cs" />
+    <Compile Include="..\SharedSource\UrlLoadingStrategy.cs" Link="SharedSource\UrlLoadingStrategy.cs" />
+  </ItemGroup>
+
+  <!--
+    WebView2Loader.dll is redistributed from the Microsoft.Web.WebView2 package.
+    Each file is packed as a NuGet native runtime asset for package consumers, and copied to the output of
+    ProjectReference consumers (WebView2Utilities.Initialize probes <app dir> and <app dir>\runtimes\win-<arch>\native).
+    One item per file: pack de-duplicates by source path, so a second item for the same file would shadow this one.
+  -->
+  <ItemGroup Condition="'$(PkgMicrosoft_Web_WebView2)' != ''">
+    <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x64\native\WebView2Loader.dll" Link="runtimes\win-x64\native\WebView2Loader.dll" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="runtimes\win-x64\native\" Visible="false" />
+    <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x86\native\WebView2Loader.dll" Link="runtimes\win-x86\native\WebView2Loader.dll" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="runtimes\win-x86\native\" Visible="false" />
+    <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-arm64\native\WebView2Loader.dll" Link="runtimes\win-arm64\native\WebView2Loader.dll" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="runtimes\win-arm64\native\" Visible="false" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="..\icon.png" Pack="True" PackagePath="" Visible="false" Link="icon.png" />
+    <None Include="..\README.md" Pack="True" PackagePath="" Visible="false" Link="README.md" />
+    <Content Remove="build\**\*" />
+    <None Include="build\**\*" Pack="True" PackagePath="build\%(RecursiveDir)%(FileName)%(Extension)" />
+  </ItemGroup>
+
+</Project>

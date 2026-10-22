@@ -1,0 +1,31 @@
+@page "/"
+@using System.Runtime.InteropServices
+@implements IDisposable
+@inject HostEvents HostEvents
+
+<h1>Blazor on WebView2Aot</h1>
+
+<p>
+    This page is rendered by Blazor inside WebView2, hosted in a plain Win32 window through
+    <a href="https://github.com/smourier/WebView2Aot" target="_blank">WebView2Aot</a>: no WinForms, no WPF,
+    no built-in COM interop.
+</p>
+
+<table class="info">
+    <tbody>
+        <tr><th>Native AOT</th><td>@(System.Runtime.JitInfo.GetCompiledMethodCount() == 0 ? "Yes" : "No (JIT)")</td></tr>
+        <tr><th>Runtime</th><td>@RuntimeInformation.FrameworkDescription</td></tr>
+        <tr><th>Process architecture</th><td>@RuntimeInformation.ProcessArchitecture</td></tr>
+        <tr><th>OS</th><td>@RuntimeInformation.OSDescription</td></tr>
+        <tr><th>Window activations</th><td>@HostEvents.ActivationCount <small>(pushed from the native host via TryDispatchAsync)</small></td></tr>
+    </tbody>
+</table>
+
+@code {
+    protected override void OnInitialized() => HostEvents.Activated += OnActivated;
+
+    // TryDispatchAsync already runs on the Blazor dispatcher, so StateHasChanged can be called directly.
+    private void OnActivated() => StateHasChanged();
+
+    public void Dispose() => HostEvents.Activated -= OnActivated;
+}

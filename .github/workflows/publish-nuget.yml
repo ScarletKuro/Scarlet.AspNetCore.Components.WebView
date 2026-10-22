@@ -45,6 +45,7 @@ jobs:
         run: |
           dotnet pack WindowsForms/Microsoft.AspNetCore.Components.WebView.WindowsForms.csproj --configuration Release --no-build --output packages /p:PackageVersion=${{ steps.version.outputs.package_version }} /p:Version=${{ steps.version.outputs.package_version }}
           dotnet pack Wpf/Microsoft.AspNetCore.Components.WebView.Wpf.csproj --configuration Release --no-build --output packages /p:PackageVersion=${{ steps.version.outputs.package_version }} /p:Version=${{ steps.version.outputs.package_version }}
+          dotnet pack Win32Aot/Microsoft.AspNetCore.Components.WebView.Win32Aot.csproj --configuration Release --no-build --output packages /p:PackageVersion=${{ steps.version.outputs.package_version }} /p:Version=${{ steps.version.outputs.package_version }}
 
       - name: Push packages to NuGet
         run: |

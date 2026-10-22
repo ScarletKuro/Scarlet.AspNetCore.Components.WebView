@@ -1,0 +1,73 @@
+@* Port of Home.razor from https://github.com/ScarletKuro/WpfIssueThreading (dotnet/maui#34855). *@
+@using System.Threading
+
+@if (_loading)
+{
+    <p>Loading...</p>
+    <p>Close the window while loading...</p>
+}
+else
+{
+    <p>done</p>
+}
+
+@code {
+    private static int s_started;
+    private static int s_finished;
+
+    private bool _loading;
+
+    [Parameter] public bool ThrowException { get; set; }
+
+    [Parameter] public int Delay { get; set; } = 5000;
+
+    public static int Started => Volatile.Read(ref s_started);
+
+    public static int Finished => Volatile.Read(ref s_finished);
+
+    public static void Reset()
+    {
+        Volatile.Write(ref s_started, 0);
+        Volatile.Write(ref s_finished, 0);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        _ = RunBackgroundWork();
+    }
+
+    private async Task RunBackgroundWork()
+    {
+        _loading = true;
+        await InvokeAsync(StateHasChanged);
+        Interlocked.Increment(ref s_started);
+
+        try
+        {
+            await Task.Delay(Delay);
+
+            if (ThrowException)
+            {
+                throw new Exception("Exception");
+            }
+        }
+        catch (Exception exception)
+        {
+            await DispatchExceptionAsync(exception);
+        }
+        finally
+        {
+            _loading = false;
+            try
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+            finally
+            {
+                Interlocked.Increment(ref s_finished);
+            }
+        }
+    }
+}

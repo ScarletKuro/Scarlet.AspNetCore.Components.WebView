@@ -5,4 +5,13 @@
   <Folder Name="/Wpf/">
     <Project Path="Wpf/Microsoft.AspNetCore.Components.WebView.Wpf.csproj" />
   </Folder>
+  <Folder Name="/Win32Aot/">
+    <Project Path="Win32Aot/Microsoft.AspNetCore.Components.WebView.Win32Aot.csproj" />
+  </Folder>
+  <Folder Name="/examples/">
+    <Project Path="examples/Win32Aot.BlazorApp/Win32Aot.BlazorApp.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Win32Aot.LifetimeTests/Win32Aot.LifetimeTests.csproj" />
+  </Folder>
 </Solution>
