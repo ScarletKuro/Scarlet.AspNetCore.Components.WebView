@@ -1,0 +1,29 @@
+@page "/"
+@using System.Runtime.InteropServices
+@implements IDisposable
+@inject HostEvents HostEvents
+
+<h1>Blazor in Windows Forms</h1>
+
+<p>
+    This page is rendered by Blazor inside WebView2, hosted in a Windows Forms <code>Form</code> by
+    <code>Scarlet.AspNetCore.Components.WebView.WindowsForms</code>.
+</p>
+
+<table class="info">
+    <tbody>
+        <tr><th>Runtime</th><td>@RuntimeInformation.FrameworkDescription</td></tr>
+        <tr><th>Process architecture</th><td>@RuntimeInformation.ProcessArchitecture</td></tr>
+        <tr><th>OS</th><td>@RuntimeInformation.OSDescription</td></tr>
+        <tr><th>Window activations</th><td>@HostEvents.ActivationCount <small>(pushed from the host via TryDispatchAsync)</small></td></tr>
+    </tbody>
+</table>
+
+@code {
+    protected override void OnInitialized() => HostEvents.Activated += OnActivated;
+
+    // TryDispatchAsync already runs on the Blazor dispatcher, so StateHasChanged can be called directly.
+    private void OnActivated() => StateHasChanged();
+
+    public void Dispose() => HostEvents.Activated -= OnActivated;
+}

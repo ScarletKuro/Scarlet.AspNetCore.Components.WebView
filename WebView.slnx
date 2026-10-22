@@ -10,8 +10,13 @@
   </Folder>
   <Folder Name="/examples/">
     <Project Path="examples/Win32Aot.BlazorApp/Win32Aot.BlazorApp.csproj" />
+    <Project Path="examples/WindowsForms.BlazorApp/WindowsForms.BlazorApp.csproj" />
+    <Project Path="examples/Wpf.BlazorApp/Wpf.BlazorApp.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/LifetimeTests.Components/LifetimeTests.Components.csproj" />
     <Project Path="tests/Win32Aot.LifetimeTests/Win32Aot.LifetimeTests.csproj" />
+    <Project Path="tests/WindowsForms.LifetimeTests/WindowsForms.LifetimeTests.csproj" />
+    <Project Path="tests/Wpf.LifetimeTests/Wpf.LifetimeTests.csproj" />
   </Folder>
 </Solution>

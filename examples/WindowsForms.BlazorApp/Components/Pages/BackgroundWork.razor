@@ -1,0 +1,43 @@
+@page "/background"
+@implements IDisposable
+@inject BackgroundWorkWindows Windows
+
+<h1>Background work</h1>
+
+<p>
+    Reproduces <a href="https://github.com/dotnet/maui/issues/34855" target="_blank">dotnet/maui#34855</a>:
+    a component keeps working after its window is closed, then calls <code>InvokeAsync(StateHasChanged)</code>
+    and <code>DispatchExceptionAsync</code> on a view that no longer exists, while the app keeps running.
+</p>
+
+<ol>
+    <li>Open a window below.</li>
+    <li>Close it while it shows <em>Loading...</em>.</li>
+    <li>Wait 5 seconds. The log shows the work finishing after the window closed; no error dialog should appear.</li>
+</ol>
+
+<button class="btn" @onclick="() => Windows.Open(throwException: true)">Open window (throws, DispatchExceptionAsync)</button>
+<button class="btn" @onclick="() => Windows.Open(throwException: false)">Open window (no exception)</button>
+
+<h2>Log</h2>
+@if (Windows.Log.Count == 0)
+{
+    <p>No windows opened yet.</p>
+}
+else
+{
+    <ul class="log">
+        @foreach (var entry in Windows.Log)
+        {
+            <li>@entry</li>
+        }
+    </ul>
+}
+
+@code {
+    protected override void OnInitialized() => Windows.Changed += OnChanged;
+
+    private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public void Dispose() => Windows.Changed -= OnChanged;
+}

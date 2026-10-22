@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    UI smoke test for examples/Win32Aot.BlazorApp.
+    UI smoke test for the example apps (examples/Win32Aot.BlazorApp, WindowsForms.BlazorApp, Wpf.BlazorApp).
 
 .DESCRIPTION
     Starts the app and drives it through UI Automation only (no mouse or keyboard input), so it runs on a CI runner
@@ -8,14 +8,19 @@
     (dotnet/maui#34855: windows closed while their component keeps working must not crash the app), and that the
     app exits cleanly. Screenshots of the windows are written to -OutDir. Exit code 0 means every check passed.
 
+    The examples share their pages, so only the home page heading differs between them.
     Requires Windows PowerShell 5.1 (UIAutomationClient ships with .NET Framework).
 
 .EXAMPLE
     powershell -File tests/ui/Test-BlazorApp.ps1 -Exe artifacts/win32aot-example/Win32Aot.BlazorApp.exe -ExpectNativeAot
+
+.EXAMPLE
+    powershell -File tests/ui/Test-BlazorApp.ps1 -Exe artifacts/wpf-example/Wpf.BlazorApp.exe -HomeHeading 'Blazor in WPF'
 #>
 param(
     [Parameter(Mandatory)] [string] $Exe,
-    [string] $OutDir = (Join-Path ([IO.Path]::GetTempPath()) 'Win32Aot.BlazorApp.UITest'),
+    [string] $HomeHeading = 'Blazor on WebView2Aot',
+    [string] $OutDir = (Join-Path ([IO.Path]::GetTempPath()) "$([IO.Path]::GetFileNameWithoutExtension($Exe)).UITest"),
     [switch] $ExpectNativeAot
 )
 
@@ -37,7 +42,7 @@ public static class Win32
 $AE = [System.Windows.Automation.AutomationElement]
 $Scope = [System.Windows.Automation.TreeScope]
 $AnyElement = [System.Windows.Automation.Condition]::TrueCondition
-$ErrorDialogTitle = 'Win32Aot.BlazorApp - Error'
+$ErrorDialogTitle = "$([IO.Path]::GetFileNameWithoutExtension($Exe)) - Error" # NativeDialogs.ShowError in the examples
 $WM_CLOSE = 0x0010
 
 $Exe = (Resolve-Path $Exe).Path
@@ -120,7 +125,7 @@ try {
     $main = $AE::FromHandle($mainHwnd)
 
     # Home
-    Check 'Home page renders' ($null -ne (Find-ByName $main 'Blazor on WebView2Aot' 30))
+    Check 'Home page renders' ($null -ne (Find-ByName $main $HomeHeading 30))
     if ($ExpectNativeAot) {
         Check 'Runs as a NativeAOT executable' ($null -ne (Find-ByName $main 'Yes'))
     }
@@ -161,7 +166,7 @@ try {
         $log = Get-BackgroundLog $main
         $closedAt = $log.IndexOf("#${id}: window closed")
         Check "$label closed before its work finished" (($closedAt -ge 0) -and ($closedAt -lt $log.IndexOf("#${id}: background work finished")))
-        Check "$label raised no UnhandledException" ($log -notmatch "#${id}: UNHANDLED")
+        Check "$label raised no unhandled exception" ($log -notmatch 'UNHANDLED')
         Check "$label showed no error dialog" (Test-NoErrorDialog)
     }
     Save-Screenshot $mainHwnd '5-background-log'

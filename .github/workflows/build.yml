@@ -97,3 +97,57 @@ jobs:
           name: win32aot-ui-test-screenshots
           path: artifacts/ui-test/
           if-no-files-found: ignore
+
+  # The same lifetime scenarios and UI smoke test for the Windows Forms and WPF hosts (JIT only).
+  desktop-tests:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - host: WindowsForms
+            heading: Blazor in Windows Forms
+          - host: Wpf
+            heading: Blazor in WPF
+
+    name: ${{ matrix.host }} tests
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # The WindowsForms and Wpf hosts target net9.0-windows, so the tests need the .NET 9 runtime.
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            9.0.x
+            10.0.x
+
+      - name: Lifetime tests
+        shell: pwsh
+        timeout-minutes: 10
+        run: dotnet run --project tests/${{ matrix.host }}.LifetimeTests/${{ matrix.host }}.LifetimeTests.csproj -c Release
+
+      - name: Publish example
+        shell: pwsh
+        run: dotnet publish examples/${{ matrix.host }}.BlazorApp/${{ matrix.host }}.BlazorApp.csproj -c Release -o artifacts/example
+
+      - name: UI smoke test of the example
+        shell: powershell
+        timeout-minutes: 10
+        run: |
+          foreach ($attempt in 1, 2) {
+            powershell -NoProfile -ExecutionPolicy Bypass -File tests/ui/Test-BlazorApp.ps1 -Exe artifacts/example/${{ matrix.host }}.BlazorApp.exe -HomeHeading '${{ matrix.heading }}' -OutDir "artifacts/ui-test/attempt-$attempt"
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            Write-Host "::warning::UI smoke test attempt $attempt failed"
+          }
+          exit 1
+
+      - name: Upload UI test screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.host }}-ui-test-screenshots
+          path: artifacts/ui-test/
+          if-no-files-found: ignore
