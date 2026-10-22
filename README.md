@@ -22,6 +22,9 @@ problems are still open. This repository forks those hosts and releases them ind
 - **Lifetime fixes.** Closing a window while components still run background work no longer crashes the app
   ([dotnet/maui#34855](https://github.com/dotnet/maui/issues/34855)), and WPF's `DisposeAsync` disposes the WebView on
   the UI thread ([dotnet/maui#26746](https://github.com/dotnet/maui/issues/26746)).
+- **WPF without blank screens.** The Wpf package keeps the standard `WebView2` control instead of the
+  `WebView2CompositionControl` that Microsoft's WPF host uses since .NET 10. The composition control can leave the
+  window blank on startup ([MicrosoftEdge/WebView2Feedback#5566](https://github.com/MicrosoftEdge/WebView2Feedback/issues/5566)).
 - **Features.** Shared WebView2 environments for all views, and bindable WPF `RootComponent`s that pick up the
   `DataContext`.
 - **A NativeAOT host.** The WinForms and WPF hosts depend on `Microsoft.Web.WebView2`, whose built-in COM interop can

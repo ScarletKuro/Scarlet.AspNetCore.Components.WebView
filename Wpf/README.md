@@ -21,8 +21,11 @@ is a fork of that code, released independently, with these changes:
   `InvalidCastException` for `ICoreWebView2Controller` ([dotnet/maui#26746](https://github.com/dotnet/maui/issues/26746)).
 - **Bindable `RootComponent`.** `Selector`, `ComponentType` and `Parameters` are dependency properties, and root
   components are part of the logical tree, so they can bind to the `BlazorWebView`'s `DataContext` in XAML.
-- **Classic `WebView2` control.** The view hosts the standard `WebView2` control rather than
-  `WebView2CompositionControl`.
+- **No blank screen on startup.** Since .NET 10, Microsoft's WPF `BlazorWebView` is built on
+  `WebView2CompositionControl`, which can show a blank window instead of the page, and the window only recovers once
+  the page changes or the control is moved or shown again
+  ([MicrosoftEdge/WebView2Feedback#5566](https://github.com/MicrosoftEdge/WebView2Feedback/issues/5566)). This package
+  keeps the standard `WebView2` control, which doesn't have this problem.
 - **Shared WebView2 environment.** Several `BlazorWebView`s can reuse one `CoreWebView2Environment`
   (see [Sharing a WebView2 environment](#sharing-a-webview2-environment)).
 

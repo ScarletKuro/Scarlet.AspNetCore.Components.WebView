@@ -23,7 +23,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>Scarlet.AspNetCore.Components.WebView.Wpf</PackageId>
     <PackageTags>blazor;webview;aspnet;wpf;scarletkuro</PackageTags>
-    <Description>Blazor Hybrid for WPF: host Razor components in WebView2. A drop-in replacement for Microsoft.AspNetCore.Components.WebView.Wpf with lifetime fixes, bindable root components and shared WebView2 environments.</Description>
+    <Description>Blazor Hybrid for WPF: host Razor components in WebView2. A drop-in replacement for Microsoft.AspNetCore.Components.WebView.Wpf built on the standard WebView2 control, with lifetime fixes, bindable root components and shared WebView2 environments.</Description>
   </PropertyGroup>
 
   <ItemGroup>
