@@ -87,7 +87,8 @@ await view.DisposeAsync();           // before destroying the parent window
 
 The API mirrors the WinForms/WPF `BlazorWebView`: `UrlLoading`, `BlazorWebViewInitializing` (user data folder, browser
 folder, environment options, or a pre-created environment), `BlazorWebViewInitialized`, `TryDispatchAsync`,
-`UseSharedCoreWebView2Environment` and `AddBlazorWebViewDeveloperTools`. On top of that:
+`UseSharedCoreWebView2Environment` (see [Sharing a WebView2 environment](#sharing-a-webview2-environment)) and
+`AddBlazorWebViewDeveloperTools`. On top of that:
 
 - `UnhandledException`: reports exceptions from work dispatched to the UI thread. Set `Handled` to keep the process
   alive; otherwise the exception is rethrown as a normal unhandled exception.
@@ -98,6 +99,62 @@ Closing or destroying a window while components still run background work is saf
 navigations and messages are dropped instead of failing
 ([dotnet/maui#34855](https://github.com/dotnet/maui/issues/34855)). CI checks these scenarios both with the JIT and as
 a NativeAOT executable.
+
+## Sharing a WebView2 environment
+
+By default every `BlazorWebView` creates its own WebView2 environment. Creating one is asynchronous and part of the time
+before a view shows anything. If your app opens several views, or opens and closes them often, create the environment
+once and share it: later views only create their WebView2 controller, and every view uses the same user data folder and
+options.
+
+The short form takes a factory, which runs once:
+
+```csharp
+services.AddWin32AotBlazorWebView()
+    .UseSharedCoreWebView2Environment(async (sp, _) =>
+        await WebView2.Functions.CreateCoreWebView2EnvironmentWithOptionsAsync(
+            browserExecutableFolder: null,
+            userDataFolder: @"C:\MyApp\WebView2",
+            environmentOptions: null)
+        ?? throw new InvalidOperationException("WebView2 environment could not be created."));
+```
+
+For full control, implement `ICoreWebView2EnvironmentProvider`:
+
+```csharp
+public sealed class SharedWebView2Environment : ICoreWebView2EnvironmentProvider
+{
+    // Created on first use. Concurrent first callers share the same task, and a failure is cached for all of them.
+    private readonly Lazy<Task<IComObject<ICoreWebView2Environment>>> _environment = new(CreateAsync);
+
+    public ValueTask<IComObject<ICoreWebView2Environment>> GetEnvironmentAsync(CancellationToken cancellationToken = default)
+        => new(_environment.Value);
+
+    private static async Task<IComObject<ICoreWebView2Environment>> CreateAsync()
+    {
+        // A persistent user data folder keeps the HTTP cache and WebView2 state across app restarts.
+        var userDataFolder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MyApp", "WebView2");
+        Directory.CreateDirectory(userDataFolder);
+
+        return await WebView2.Functions.CreateCoreWebView2EnvironmentWithOptionsAsync(
+                browserExecutableFolder: null,
+                userDataFolder: userDataFolder,
+                environmentOptions: null)
+            ?? throw new InvalidOperationException("WebView2 environment could not be created.");
+    }
+}
+```
+
+```csharp
+services.AddWin32AotBlazorWebView()
+    .UseSharedCoreWebView2Environment<SharedWebView2Environment>();
+```
+
+Pass a `WebView2.CoreWebView2EnvironmentOptions` as `environmentOptions` to set browser arguments, the language, or
+other environment options. There is also an overload that takes an already-created environment. You own the
+environment's lifetime; the views never dispose a shared environment. A single view can still use its own environment
+through `BlazorWebViewInitializingEventArgs.CoreWebView2Environment`, which takes precedence.
 
 ## NativeAOT and trimming
 

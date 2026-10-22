@@ -25,8 +25,9 @@ problems are still open. This repository forks those hosts and releases them ind
 - **WPF without blank screens.** The Wpf package keeps the standard `WebView2` control instead of the
   `WebView2CompositionControl` that Microsoft's WPF host uses since .NET 10. The composition control can leave the
   window blank on startup ([MicrosoftEdge/WebView2Feedback#5566](https://github.com/MicrosoftEdge/WebView2Feedback/issues/5566)).
-- **Features.** Shared WebView2 environments for all views, and bindable WPF `RootComponent`s that pick up the
-  `DataContext`.
+- **Features.** One shared WebView2 environment for all views (`UseSharedCoreWebView2Environment`, in every package),
+  so each new view skips creating its own. Bindable WPF `RootComponent`s that pick up the `DataContext`, proposed
+  upstream in [dotnet/maui#34941](https://github.com/dotnet/maui/issues/34941) and closed as not planned.
 - **A NativeAOT host.** The WinForms and WPF hosts depend on `Microsoft.Web.WebView2`, whose built-in COM interop can
   never work with NativeAOT or trimming. The Win32Aot package hosts Blazor on
   [WebView2Aot](https://github.com/smourier/WebView2Aot) instead, so a Blazor app can be published as a single ~10 MB
