@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - '**'
+  # Called by publish-nuget.yml so a release only goes out when every job here passes.
+  workflow_call:
 
 permissions:
   contents: read
@@ -26,6 +28,16 @@ jobs:
 
       - name: Build
         run: dotnet build WebView.slnx --configuration Release --no-restore /p:ContinuousIntegrationBuild=true
+
+      # Examples and tests use ProjectReference, so check what actually goes into the packages.
+      - name: Pack and verify packages
+        shell: pwsh
+        run: |
+          foreach ($project in 'WindowsForms/Microsoft.AspNetCore.Components.WebView.WindowsForms.csproj', 'Wpf/Microsoft.AspNetCore.Components.WebView.Wpf.csproj', 'Win32Aot/Microsoft.AspNetCore.Components.WebView.Win32Aot.csproj') {
+            dotnet pack $project --configuration Release --no-build --output artifacts/packages
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          ./tests/package/Test-Packages.ps1 -PackageDir artifacts/packages
 
   # NativeAOT compilation needs the MSVC linker, so it runs on Windows.
   win32aot-native-aot:

@@ -48,14 +48,14 @@
     One item per file: pack de-duplicates by source path, so a second item for the same file would shadow this one.
   -->
   <ItemGroup Condition="'$(PkgMicrosoft_Web_WebView2)' != ''">
-    <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x64\native\WebView2Loader.dll" Link="runtimes\win-x64\native\WebView2Loader.dll" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="runtimes\win-x64\native\" Visible="false" />
-    <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x86\native\WebView2Loader.dll" Link="runtimes\win-x86\native\WebView2Loader.dll" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="runtimes\win-x86\native\" Visible="false" />
-    <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-arm64\native\WebView2Loader.dll" Link="runtimes\win-arm64\native\WebView2Loader.dll" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="runtimes\win-arm64\native\" Visible="false" />
+    <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x64\native\WebView2Loader.dll" Link="runtimes\win-x64\native\WebView2Loader.dll" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="runtimes/win-x64/native/" Visible="false" />
+    <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-x86\native\WebView2Loader.dll" Link="runtimes\win-x86\native\WebView2Loader.dll" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="runtimes/win-x86/native/" Visible="false" />
+    <Content Include="$(PkgMicrosoft_Web_WebView2)\runtimes\win-arm64\native\WebView2Loader.dll" Link="runtimes\win-arm64\native\WebView2Loader.dll" CopyToOutputDirectory="PreserveNewest" Pack="true" PackagePath="runtimes/win-arm64/native/" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>
     <None Include="..\icon.png" Pack="True" PackagePath="" Visible="false" Link="icon.png" />
-    <None Include="..\README.md" Pack="True" PackagePath="" Visible="false" Link="README.md" />
+    <None Include="README.md" Pack="True" PackagePath="" />
     <Content Remove="build\**\*" />
     <None Include="build\**\*" Pack="True" PackagePath="build\%(RecursiveDir)%(FileName)%(Extension)" />
   </ItemGroup>

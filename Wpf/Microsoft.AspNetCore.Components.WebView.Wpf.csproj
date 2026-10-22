@@ -23,7 +23,7 @@
     <IsPackable>true</IsPackable>
     <PackageId>Scarlet.AspNetCore.Components.WebView.Wpf</PackageId>
     <PackageTags>blazor;webview;aspnet;wpf;scarletkuro</PackageTags>
-    <Description>Build WPF apps with Blazor and WebView2.</Description>
+    <Description>Blazor Hybrid for WPF: host Razor components in WebView2. A drop-in replacement for Microsoft.AspNetCore.Components.WebView.Wpf built on the standard WebView2 control, with lifetime fixes, bindable root components and shared WebView2 environments.</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -37,7 +37,7 @@
 
   <ItemGroup>
     <None Include="..\icon.png" Pack="True" PackagePath="" Visible="false" Link="icon.png" />
-    <None Include="..\README.md" Pack="True" PackagePath="" Visible="false" Link="README.md" />
+    <None Include="README.md" Pack="True" PackagePath="" />
     <Content Remove="build\**\*" />
     <None Include="build\**\*" Pack="True" PackagePath="build\%(RecursiveDir)%(FileName)%(Extension)" />
   </ItemGroup>

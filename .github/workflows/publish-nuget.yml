@@ -9,7 +9,12 @@ permissions:
   contents: read
 
 jobs:
+  # Build, NativeAOT checks, lifetime tests and UI smoke tests for the tagged commit.
+  tests:
+    uses: ./.github/workflows/build.yml
+
   publish:
+    needs: tests
     runs-on: ubuntu-latest
 
     steps:
@@ -46,6 +51,10 @@ jobs:
           dotnet pack WindowsForms/Microsoft.AspNetCore.Components.WebView.WindowsForms.csproj --configuration Release --no-build --output packages /p:PackageVersion=${{ steps.version.outputs.package_version }} /p:Version=${{ steps.version.outputs.package_version }}
           dotnet pack Wpf/Microsoft.AspNetCore.Components.WebView.Wpf.csproj --configuration Release --no-build --output packages /p:PackageVersion=${{ steps.version.outputs.package_version }} /p:Version=${{ steps.version.outputs.package_version }}
           dotnet pack Win32Aot/Microsoft.AspNetCore.Components.WebView.Win32Aot.csproj --configuration Release --no-build --output packages /p:PackageVersion=${{ steps.version.outputs.package_version }} /p:Version=${{ steps.version.outputs.package_version }}
+
+      - name: Verify packages
+        shell: pwsh
+        run: ./tests/package/Test-Packages.ps1 -PackageDir packages
 
       - name: Push packages to NuGet
         run: |
