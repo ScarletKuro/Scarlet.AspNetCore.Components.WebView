@@ -83,6 +83,12 @@ view.MoveFocus();                    // on WM_SETFOCUS
 await view.DisposeAsync();           // before destroying the parent window
 ```
 
+Work for the UI thread goes through that thread's `DirectNMessageQueue` from
+[Scarlet.DirectN.Threading](https://www.nuget.org/packages/Scarlet.DirectN.Threading). It is the queue
+[Scarlet.Extensions.Hosting.DirectN](https://github.com/ScarletKuro/Scarlet.Extensions.Hosting.DirectN) uses too, so in a hosted
+DirectN application Blazor shares one queue, ordering and `SynchronizationContext` with the rest of the UI thread. If the
+thread has no `SynchronizationContext` yet, the view installs the queue's.
+
 ## API
 
 The API mirrors the WinForms/WPF `BlazorWebView`: `UrlLoading`, `BlazorWebViewInitializing` (user data folder, browser

@@ -14,6 +14,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Scarlet.DirectN.Threading;
 using WebView2;
 using WebView2.Utilities;
 
@@ -38,7 +39,7 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 	public class BlazorWebView : IAsyncDisposable
 	{
 		private readonly nint _parentWindow;
-		private readonly Win32MessageQueue _queue;
+		private readonly DirectNMessageQueue _queue;
 		private readonly Win32Dispatcher _dispatcher;
 		private Win32AotWebViewManager? _webviewManager;
 		private ILogger _logger = NullLogger<BlazorWebView>.Instance;
@@ -68,7 +69,7 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 			}
 
 			_parentWindow = parentWindow;
-			_queue = Win32MessageQueue.GetOrCreateForCurrentThread();
+			_queue = DirectNMessageQueue.GetOrCreateForCurrentThread();
 			_queue.UnhandledException += HandleQueueUnhandledException;
 			_dispatcher = new Win32Dispatcher(_queue, HandleUnhandledException);
 
@@ -487,22 +488,24 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 			}
 			catch (Exception handlerException)
 			{
-				Win32MessageQueue.RethrowAsUnhandled(new AggregateException(exception, handlerException));
+				DirectNMessageQueue.RethrowAsUnhandled(new AggregateException(exception, handlerException));
 				return;
 			}
 
 			if (!args.Handled)
 			{
-				Win32MessageQueue.RethrowAsUnhandled(exception);
+				DirectNMessageQueue.RethrowAsUnhandled(exception);
 			}
 		}
 
 		// Exceptions from other code posted to the UI thread's synchronization context (e.g. async void continuations).
-		private void HandleQueueUnhandledException(object? sender, BlazorWebViewUnhandledExceptionEventArgs args)
+		private void HandleQueueUnhandledException(object? sender, DirectNUnhandledExceptionEventArgs e)
 		{
-			if (!args.Handled)
+			if (!e.Handled)
 			{
+				var args = new BlazorWebViewUnhandledExceptionEventArgs(e.Exception);
 				RaiseUnhandledException(args);
+				e.Handled = args.Handled;
 			}
 		}
 

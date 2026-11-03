@@ -1,14 +1,15 @@
 using System;
 using System.Threading.Tasks;
+using Scarlet.DirectN.Threading;
 
 namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 {
 	/// <summary>
-	/// <see cref="Dispatcher"/> implementation that invokes work on the UI thread through a <see cref="Win32MessageQueue"/>.
+	/// <see cref="Dispatcher"/> implementation that invokes work on the UI thread through a <see cref="DirectNMessageQueue"/>.
 	/// </summary>
 	internal sealed class Win32Dispatcher : Dispatcher
 	{
-		private readonly Win32MessageQueue _queue;
+		private readonly DirectNMessageQueue _queue;
 		private readonly Action<Exception> _onUnhandledException;
 
 		/// <summary>
@@ -17,7 +18,7 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 		/// <param name="queue">The queue bound to the UI thread.</param>
 		/// <param name="onUnhandledException">Invoked on the UI thread with exceptions thrown by dispatched work. The
 		/// owner ignores them once it has been disposed (mirroring WinForms, where a disposed control can't rethrow).</param>
-		public Win32Dispatcher(Win32MessageQueue queue, Action<Exception> onUnhandledException)
+		public Win32Dispatcher(DirectNMessageQueue queue, Action<Exception> onUnhandledException)
 		{
 			_queue = queue ?? throw new ArgumentNullException(nameof(queue));
 			_onUnhandledException = onUnhandledException ?? throw new ArgumentNullException(nameof(onUnhandledException));
@@ -191,18 +192,12 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 				return;
 			}
 
-			try
+			// Dropped when the UI thread's queue is closed: there is no one left to report to.
+			_queue.TryPost(static state =>
 			{
-				_queue.Post(static state =>
-				{
-					var (self, exception) = ((Win32Dispatcher, Exception))state!;
-					self._onUnhandledException(exception);
-				}, (this, ex));
-			}
-			catch (System.ComponentModel.Win32Exception)
-			{
-				// The UI thread's message loop is gone; there is no one left to report to.
-			}
+				var (self, exception) = ((Win32Dispatcher, Exception))state!;
+				self._onUnhandledException(exception);
+			}, (this, ex));
 		}
 
 		private static bool IsRendererDisposedRace(Exception ex) =>

@@ -11,8 +11,15 @@
 
 .EXAMPLE
     pwsh tests/package/Test-Packages.ps1 -PackageDir artifacts/packages
+
+.EXAMPLE
+    pwsh tests/package/Test-Packages.ps1 -PackageDir artifacts/packages -Package Scarlet.AspNetCore.Components.WebView.Win32Aot
+    Checks only the given packages (a release packs one).
 #>
-param([Parameter(Mandatory)] [string] $PackageDir)
+param(
+    [Parameter(Mandatory)] [string] $PackageDir,
+    [string[]] $Package
+)
 
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -33,13 +40,15 @@ $expected = @{
             'runtimes/win-x86/native/WebView2Loader.dll',
             'runtimes/win-arm64/native/WebView2Loader.dll',
             'build/Scarlet.AspNetCore.Components.WebView.Win32Aot.rd.xml')
-        RequiredDependencies = @('WebView2Aot', 'Microsoft.AspNetCore.Components.WebView')
+        RequiredDependencies = @('WebView2Aot', 'Scarlet.DirectN.Threading', 'Microsoft.AspNetCore.Components.WebView')
         ForbiddenDependencies = @('Microsoft.Web.WebView2')
     }
 }
 
 $failures = New-Object System.Collections.Generic.List[string]
-foreach ($id in $expected.Keys) {
+$ids = if ($Package) { $Package } else { @($expected.Keys) }
+foreach ($id in $ids) {
+    if (-not $expected.ContainsKey($id)) { $failures.Add("${id}: unknown package"); continue }
     $spec = $expected[$id]
     $nupkg = Get-ChildItem $PackageDir -Filter "$id.*.nupkg" | Where-Object { $_.Name -match "^$([regex]::Escape($id))\.\d" -and $_.Name -notlike '*.snupkg' } | Select-Object -First 1
     if (-not $nupkg) { $failures.Add("${id}: package not found in $PackageDir"); continue }

@@ -1,24 +1,91 @@
-name: Publish NuGet packages
+name: Release
 
+# Run manually (Actions > Release > Run workflow): each package is released on its own, with its own version.
 on:
-  push:
-    tags:
-      - '*'
+  workflow_dispatch:
+    inputs:
+      package:
+        description: Package to release
+        required: true
+        type: choice
+        options:
+          - Win32Aot
+          - Wpf
+          - WindowsForms
+      version:
+        description: Package version (SemVer 2.0), e.g. 1.2.0 or 1.3.0-preview.1
+        required: true
+        type: string
 
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ inputs.package }}
+  cancel-in-progress: false
+
 jobs:
-  # Build, NativeAOT checks, lifetime tests and UI smoke tests for the tagged commit.
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      project: ${{ steps.package.outputs.project }}
+      package_id: ${{ steps.package.outputs.package_id }}
+      tag: ${{ steps.package.outputs.tag }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate the request
+        id: package
+        shell: bash
+        env:
+          PACKAGE: ${{ inputs.package }}
+          VERSION: ${{ inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$REF_NAME" != "$DEFAULT_BRANCH" ]]; then
+            echo "::error::Release from $DEFAULT_BRANCH, not $REF_NAME."
+            exit 1
+          fi
+
+          version="$VERSION"
+          semver_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
+          if [[ ! "$version" =~ $semver_pattern ]]; then
+            echo "::error::'$version' is not a valid SemVer 2.0.0 version."
+            exit 1
+          fi
+
+          package="$PACKAGE"
+          tag="$package-$version"
+          if git ls-remote --exit-code --tags origin "refs/tags/$tag" > /dev/null; then
+            echo "::error::$tag was already released (the tag exists)."
+            exit 1
+          fi
+
+          echo "project=$package/Microsoft.AspNetCore.Components.WebView.$package.csproj" >> "$GITHUB_OUTPUT"
+          echo "package_id=Scarlet.AspNetCore.Components.WebView.$package" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  # Build, NativeAOT checks, lifetime tests and UI smoke tests: a release only goes out when every job passes.
   tests:
+    needs: prepare
     uses: ./.github/workflows/build.yml
 
   publish:
-    needs: tests
+    needs: [prepare, tests]
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write
+    env:
+      VERSION: ${{ inputs.version }}
+      PROJECT: ${{ needs.prepare.outputs.project }}
+      PACKAGE_ID: ${{ needs.prepare.outputs.package_id }}
+      TAG: ${{ needs.prepare.outputs.tag }}
 
     steps:
       - name: Checkout repository
@@ -29,35 +96,18 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Validate semantic version tag
-        id: version
-        shell: bash
-        run: |
-          version='${{ github.ref_name }}'
-          semver_pattern='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-((0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*)(\.(0|[1-9][0-9]*|[0-9]*[A-Za-z-][0-9A-Za-z-]*))*))?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$'
-
-          if [[ ! "$version" =~ $semver_pattern ]]; then
-            echo "Tag '$version' is not a valid SemVer 2.0.0 version." >&2
-            exit 1
-          fi
-
-          echo "package_version=$version" >> "$GITHUB_OUTPUT"
-
       - name: Restore
-        run: dotnet restore WebView.slnx
+        run: dotnet restore "$PROJECT"
 
       - name: Build
-        run: dotnet build WebView.slnx --configuration Release --no-restore /p:ContinuousIntegrationBuild=true
+        run: dotnet build "$PROJECT" --configuration Release --no-restore /p:ContinuousIntegrationBuild=true "/p:Version=$VERSION"
 
       - name: Pack
-        run: |
-          dotnet pack WindowsForms/Microsoft.AspNetCore.Components.WebView.WindowsForms.csproj --configuration Release --no-build --output packages /p:PackageVersion=${{ steps.version.outputs.package_version }} /p:Version=${{ steps.version.outputs.package_version }}
-          dotnet pack Wpf/Microsoft.AspNetCore.Components.WebView.Wpf.csproj --configuration Release --no-build --output packages /p:PackageVersion=${{ steps.version.outputs.package_version }} /p:Version=${{ steps.version.outputs.package_version }}
-          dotnet pack Win32Aot/Microsoft.AspNetCore.Components.WebView.Win32Aot.csproj --configuration Release --no-build --output packages /p:PackageVersion=${{ steps.version.outputs.package_version }} /p:Version=${{ steps.version.outputs.package_version }}
+        run: dotnet pack "$PROJECT" --configuration Release --no-build --output packages "/p:PackageVersion=$VERSION" "/p:Version=$VERSION"
 
-      - name: Verify packages
+      - name: Verify package
         shell: pwsh
-        run: ./tests/package/Test-Packages.ps1 -PackageDir packages
+        run: ./tests/package/Test-Packages.ps1 -PackageDir packages -Package $env:PACKAGE_ID
 
       - name: NuGet login
         id: nuget-login
@@ -65,7 +115,7 @@ jobs:
         with:
           user: ${{ secrets.NUGET_USER }}
 
-      - name: Push packages to NuGet
+      - name: Push package to NuGet
         run: |
           dotnet nuget push ./packages/*.nupkg \
             --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
@@ -76,3 +126,8 @@ jobs:
             --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
             --source https://api.nuget.org/v3/index.json \
             --skip-duplicate
+
+      - name: Tag the release
+        run: |
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "$TAG"
