@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <title>Avalonia + Blazor</title>
+    <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+    <div id="app">Loading Blazor...</div>
+    <div id="blazor-error-ui">An error occurred. <a href="">Reload</a></div>
+    <script>
+        window.sample = {
+            markReady: () => document.body.dataset.ready = 'true'
+        };
+    </script>
+    <script src="_framework/blazor.webview.js"></script>
+</body>
+</html>

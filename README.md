@@ -49,6 +49,8 @@ close while their components keep working):
 - [examples/WindowsForms.BlazorApp](examples/WindowsForms.BlazorApp)
 - [examples/Wpf.BlazorApp](examples/Wpf.BlazorApp)
 - [examples/Win32Aot.BlazorApp](examples/Win32Aot.BlazorApp) (published with NativeAOT)
+- [examples/Avalonia.BlazorApp](examples/Avalonia.BlazorApp) (Windows Avalonia integration with Win32Aot,
+  using Avalonia's dispatcher and shared state between Avalonia controls and Razor components)
 
 ```powershell
 dotnet run --project examples/Wpf.BlazorApp

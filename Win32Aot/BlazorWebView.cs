@@ -39,8 +39,9 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 	public class BlazorWebView : IAsyncDisposable
 	{
 		private readonly nint _parentWindow;
-		private readonly DirectNMessageQueue _queue;
-		private readonly Win32Dispatcher _dispatcher;
+		private readonly DirectNMessageQueue? _queue;
+		private readonly Dispatcher _dispatcher;
+		private readonly int _uiThreadId;
 		private Win32AotWebViewManager? _webviewManager;
 		private ILogger _logger = NullLogger<BlazorWebView>.Instance;
 		private string? _hostPage;
@@ -57,6 +58,24 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 		/// </summary>
 		/// <param name="parentWindow">The handle (HWND) of the window that will host the WebView2.</param>
 		public BlazorWebView(nint parentWindow)
+			: this(parentWindow, dispatcher: null)
+		{
+		}
+
+		/// <summary>
+		/// Creates a view using the host framework's dispatcher, or the shared DirectN queue when it is null.
+		/// Must be called on the parent window's STA UI thread.
+		/// </summary>
+		/// <param name="parentWindow">The handle (HWND) of the window that will host the WebView2.</param>
+		/// <param name="dispatcher">The host dispatcher, or null to use the shared DirectN queue.</param>
+		/// <remarks>
+		/// A supplied dispatcher must target the current thread and run asynchronous callbacks with a synchronization
+		/// context that returns to that thread. The host must have installed that context before constructing the view,
+		/// and keep its message loop running until disposal completes. The host owns the supplied dispatcher and its
+		/// exception policy, including reporting failures from fire-and-forget dispatcher work; such failures do not
+		/// pass through this view's <see cref="UnhandledException"/> event. No DirectN queue is created in this mode.
+		/// </remarks>
+		public BlazorWebView(nint parentWindow, Dispatcher? dispatcher)
 		{
 			if (parentWindow == 0)
 			{
@@ -69,15 +88,30 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 			}
 
 			_parentWindow = parentWindow;
-			_queue = DirectNMessageQueue.GetOrCreateForCurrentThread();
-			_queue.UnhandledException += HandleQueueUnhandledException;
-			_dispatcher = new Win32Dispatcher(_queue, HandleUnhandledException);
-
-			// await continuations must come back to the UI thread because WebView2 objects are thread-affine.
-			// Host frameworks such as WinForms or WPF already provide a suitable context; keep theirs.
-			if (SynchronizationContext.Current is null)
+			_uiThreadId = Environment.CurrentManagedThreadId;
+			if (dispatcher is not null)
 			{
-				SynchronizationContext.SetSynchronizationContext(_queue.SynchronizationContext);
+				if (!dispatcher.CheckAccess())
+				{
+					throw new ArgumentException("The dispatcher must target the thread creating the view.", nameof(dispatcher));
+				}
+				if (SynchronizationContext.Current is null)
+				{
+					throw new InvalidOperationException("The host must install its UI synchronization context before creating the view.");
+				}
+				_dispatcher = dispatcher;
+			}
+			else
+			{
+				_queue = DirectNMessageQueue.GetOrCreateForCurrentThread();
+				_queue.UnhandledException += HandleQueueUnhandledException;
+				_dispatcher = new Win32Dispatcher(_queue, HandleUnhandledException);
+
+				// WebView2 objects are thread-affine. Keep an existing host framework context.
+				if (SynchronizationContext.Current is null)
+				{
+					SynchronizationContext.SetSynchronizationContext(_queue.SynchronizationContext);
+				}
 			}
 
 			RootComponents.CollectionChanged += HandleRootComponentsCollectionChanged;
@@ -466,7 +500,10 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 			{
 				// The UI thread's queue and synchronization context deliberately stay alive: continuations of code
 				// awaiting this disposal (and other views on the thread) still need them.
-				_queue.UnhandledException -= HandleQueueUnhandledException;
+				if (_queue is not null)
+				{
+					_queue.UnhandledException -= HandleQueueUnhandledException;
+				}
 			}
 		}
 
@@ -525,7 +562,7 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 
 		private void ThrowIfNotOnUIThread()
 		{
-			if (!_queue.CheckAccess())
+			if (Environment.CurrentManagedThreadId != _uiThreadId)
 			{
 				throw new InvalidOperationException("BlazorWebView must be used on the thread that created it.");
 			}

@@ -89,6 +89,16 @@ Work for the UI thread goes through that thread's `DirectNMessageQueue` from
 DirectN application Blazor shares one queue, ordering and `SynchronizationContext` with the rest of the UI thread. If the
 thread has no `SynchronizationContext` yet, the view installs the queue's.
 
+When a UI framework should own scheduling as well as the message loop, use
+`new BlazorWebView(parentHwnd, dispatcher)` with an adapter implementing
+`Microsoft.AspNetCore.Components.Dispatcher`. Create it on the parent's STA UI thread after the host
+has installed its UI synchronization context. The supplied dispatcher must target that thread and keep
+asynchronous callbacks there. In this mode the view creates no DirectN queue and the host owns
+dispatcher exception reporting (including fire-and-forget failures), rather than the view's
+`UnhandledException` event. Keep the host's message loop alive until `DisposeAsync` completes.
+See [the Windows Avalonia example](../examples/Avalonia.BlazorApp) for a `NativeControlHost` wrapper,
+dispatcher adapter, shared services and asynchronous shutdown.
+
 ## API
 
 The API mirrors the WinForms/WPF `BlazorWebView`: `UrlLoading`, `BlazorWebViewInitializing` (user data folder, browser
