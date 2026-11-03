@@ -1,4 +1,5 @@
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Controls;
 using Avalonia.Threading;
 using Scarlet.DirectN.Threading;
 using Microsoft.AspNetCore.Components.WebView.Win32Aot;
@@ -166,31 +167,7 @@ internal static class SmokeTest
             Require(window.Counter.Count == 3, "Shared state survives page navigation");
             Require(!window.Counter.ComponentDisposed, "Page navigation does not dispose the root component");
 
-            var originalRect = window.BlazorHost.NativeClientRect;
-            window.Width += 120;
-            window.Height += 80;
-            window.Position = new PixelPoint(window.Position.X + 20, window.Position.Y + 20);
-            await WaitUntilAsync(() =>
-            {
-                var native = window.BlazorHost.NativeClientRect;
-                var bounds = window.BlazorHost.View.Bounds;
-                return Task.FromResult(native.right > originalRect.right && native.bottom > originalRect.bottom
-                    && native.right == bounds.right && native.bottom == bounds.bottom);
-            });
-            window.Width -= 120;
-            window.Height -= 80;
-            await WaitUntilAsync(() =>
-            {
-                var native = window.BlazorHost.NativeClientRect;
-                var bounds = window.BlazorHost.View.Bounds;
-                return Task.FromResult(native.right == originalRect.right && native.bottom == originalRect.bottom
-                    && native.right == bounds.right && native.bottom == bounds.bottom);
-            });
-            await WaitUntilAsync(async () =>
-            {
-                var renderedWidth = await ScriptAsync(window, "Math.round(innerWidth * devicePixelRatio)");
-                return int.TryParse(renderedWidth, out var width) && Math.Abs(width - window.BlazorHost.NativeClientRect.right) <= 2;
-            });
+            await VerifyResizeAsync(window);
             report.Add("PASS: Native child and WebView2 grow and shrink with the Avalonia layout.");
 
             window.Close();
@@ -231,12 +208,100 @@ internal static class SmokeTest
     private static async Task ClickButtonAsync(MainWindow window, string text) =>
         await ScriptAsync(window, $"[...document.querySelectorAll('button')].find(b => b.textContent.trim() === {JsonSerializer.Serialize(text, AppJsonContext.Default.String)})?.click()");
 
-    private static async Task WaitUntilAsync(Func<Task<bool>> condition)
+    private static async Task VerifyResizeAsync(MainWindow window)
+    {
+        window.WindowState = WindowState.Normal;
+        // A rendered route heading does not mean Avalonia has finished showing the native demo pane
+        // or moving/resizing its child HWND. Establish a settled baseline before testing size changes.
+        await WaitForWebViewSizeAsync(window, "initial layout after navigation");
+        var originalSize = window.ClientSize;
+        var originalRect = window.BlazorHost.NativeClientRect;
+        var originalMinWidth = window.MinWidth;
+        var originalMinHeight = window.MinHeight;
+        var smallerSize = new Size(originalSize.Width - 120, originalSize.Height - 80);
+        try
+        {
+            // Shrink and restore within the size the desktop already accepted. Growing beyond the startup
+            // size can be clamped on a small CI desktop. Temporarily allow shrinking below the example's
+            // preferred minimum if the initial window was already constrained to that minimum.
+            window.MinWidth = Math.Min(originalMinWidth, smallerSize.Width);
+            window.MinHeight = Math.Min(originalMinHeight, smallerSize.Height);
+            window.Width = smallerSize.Width;
+            window.Height = smallerSize.Height;
+            await WaitForWebViewSizeAsync(window, "smaller WebView size", smallerSize);
+            var smallerRect = window.BlazorHost.NativeClientRect;
+            Require(smallerRect.right < originalRect.right && smallerRect.bottom < originalRect.bottom,
+                "The native WebView must shrink in both dimensions.");
+
+            window.Width = originalSize.Width;
+            window.Height = originalSize.Height;
+            await WaitForWebViewSizeAsync(window, "restored WebView size", originalSize);
+            var restoredRect = window.BlazorHost.NativeClientRect;
+            Require(restoredRect.right > smallerRect.right && restoredRect.bottom > smallerRect.bottom,
+                "The native WebView must grow in both dimensions when restored.");
+            Require(Math.Abs(restoredRect.right - originalRect.right) <= 1 && Math.Abs(restoredRect.bottom - originalRect.bottom) <= 1,
+                "The restored native WebView must match its initial size.");
+        }
+        finally
+        {
+            window.Width = originalSize.Width;
+            window.Height = originalSize.Height;
+            window.MinWidth = originalMinWidth;
+            window.MinHeight = originalMinHeight;
+        }
+
+        window.Position = new PixelPoint(window.Position.X + 20, window.Position.Y + 20);
+        await WaitForWebViewSizeAsync(window, "WebView layout after moving the window");
+    }
+
+    private static async Task WaitForWebViewSizeAsync(MainWindow window, string description, Size? expectedClientSize = null)
+    {
+        await WaitUntilAsync(() =>
+        {
+            var host = window.BlazorHost;
+            var native = host.NativeClientRect;
+            var controller = host.View.Bounds;
+            var scale = window.RenderScaling;
+            return Task.FromResult(window.IsMeasureValid && window.IsArrangeValid && host.IsMeasureValid && host.IsArrangeValid
+                && (expectedClientSize is not { } expected ||
+                    Math.Abs(window.ClientSize.Width - expected.Width) <= 1 && Math.Abs(window.ClientSize.Height - expected.Height) <= 1)
+                && native.right > 0 && native.bottom > 0
+                && Math.Abs(native.right - host.Bounds.Width * scale) <= 1
+                && Math.Abs(native.bottom - host.Bounds.Height * scale) <= 1
+                && native.right == controller.right && native.bottom == controller.bottom);
+        }, description, () => DescribeWindow(window, $"target={expectedClientSize}"));
+
+        await WaitUntilAsync(async () =>
+        {
+            var native = window.BlazorHost.NativeClientRect;
+            return await ScriptAsync(window,
+                $"Math.abs(Math.round(innerWidth * devicePixelRatio) - {native.right}) <= 2 && " +
+                $"Math.abs(Math.round(innerHeight * devicePixelRatio) - {native.bottom}) <= 2") == "true";
+        }, $"browser viewport for {description}", () => DescribeWindow(window, $"target={expectedClientSize}"));
+    }
+
+    private static string DescribeWindow(MainWindow window, string baseline)
+    {
+        var native = window.BlazorHost.NativeClientRect;
+        var controller = window.BlazorHost.View.Bounds;
+        return $"{baseline}; client={window.ClientSize}; layout={window.BlazorHost.Bounds}; " +
+            $"native={native.right}x{native.bottom}; controller={controller.right}x{controller.bottom}; " +
+            $"scale={window.RenderScaling}; state={window.WindowState}; limits={window.MaxWidth}x{window.MaxHeight}";
+    }
+
+    private static async Task WaitUntilAsync(Func<Task<bool>> condition, string description = "smoke-test condition", Func<string>? diagnostics = null)
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
-        while (!await condition().WaitAsync(timeout.Token))
+        try
         {
-            await Task.Delay(50, timeout.Token);
+            while (!await condition().WaitAsync(timeout.Token))
+            {
+                await Task.Delay(50, timeout.Token);
+            }
+        }
+        catch (OperationCanceledException ex) when (timeout.IsCancellationRequested)
+        {
+            throw new TimeoutException($"Timed out waiting for {description}. {diagnostics?.Invoke()}", ex);
         }
     }
 

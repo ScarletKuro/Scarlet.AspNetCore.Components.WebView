@@ -37,6 +37,12 @@ public sealed class App : Application
 
             if (desktop.Args?.Contains("--smoke-test") == true)
             {
+                // Exercise the same resize path on desktops that cannot fit the example's preferred size.
+                if (desktop.Args.Contains("--smoke-test-constrained-window"))
+                {
+                    window.MaxWidth = 1000;
+                    window.MaxHeight = 650;
+                }
                 desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 window.Opened += (_, _) => _ = SmokeTest.RunAsync(window, desktop);
             }

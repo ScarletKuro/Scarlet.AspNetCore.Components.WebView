@@ -83,6 +83,8 @@ these imports automatically.
 
 ```powershell
 dotnet run --project examples/Avalonia.BlazorApp -c Release -- --smoke-test
+# Reproduce a desktop that constrains the window below its preferred startup size:
+dotnet run --project examples/Avalonia.BlazorApp -c Release -- --smoke-test --smoke-test-constrained-window
 # Or test the actual published native executable:
 ./artifacts/avalonia-example/Avalonia.BlazorApp.exe --smoke-test
 ```
@@ -92,5 +94,9 @@ directions of communication, worker dispatch, all dispatcher overloads and async
 the view's exception event and Avalonia's unhandled-exception policy. It also navigates the sidebar,
 exercises the counter, JS interop, links and error recovery, closes both background-work window variants,
 checks resize in both directions and browser viewport size, and verifies asynchronous root component disposal.
+The resize check waits for Avalonia layout, the native child HWND and WebView2 bounds to agree, then shrinks
+and restores the actual client size. It does not require the desktop to allow growth beyond the startup size.
+The constrained-window mode caps the window at 1000 by 650 logical units and runs the same checks.
+Resize timeouts include the client, layout, HWND and controller sizes, DPI scale and window limits.
 It exits with code 0 on success or 1 on failure and writes `avalonia-smoke-test.log` beside the executable.
 Use `--smoke-test-output <path>` to choose another report location (its directory must exist).

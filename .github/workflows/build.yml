@@ -90,6 +90,15 @@ jobs:
           Get-Content artifacts/avalonia-smoke-jit.log -ErrorAction SilentlyContinue
           exit $testExitCode
 
+      - name: Avalonia constrained-window smoke test (JIT)
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          dotnet run --project examples/Avalonia.BlazorApp/Avalonia.BlazorApp.csproj -c Release --no-build -- --smoke-test --smoke-test-constrained-window --smoke-test-output "$PWD/artifacts/avalonia-smoke-jit-constrained.log"
+          $testExitCode = $LASTEXITCODE
+          Get-Content artifacts/avalonia-smoke-jit-constrained.log -ErrorAction SilentlyContinue
+          exit $testExitCode
+
       - name: Avalonia integration smoke test (NativeAOT)
         shell: pwsh
         timeout-minutes: 15
