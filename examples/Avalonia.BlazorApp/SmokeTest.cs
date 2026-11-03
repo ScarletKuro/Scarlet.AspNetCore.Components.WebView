@@ -39,7 +39,7 @@ internal static class SmokeTest
             var dispatcher = window.BlazorHost.View.Dispatcher;
             await Task.Run(async () =>
             {
-                await dispatcher.InvokeAsync((Action)(() => dispatcher.AssertAccess()));
+                await dispatcher.InvokeAsync((Action)dispatcher.AssertAccess);
                 Require(await dispatcher.InvokeAsync((Func<int>)(() => 42)) == 42, "Synchronous result");
                 await dispatcher.InvokeAsync((Func<Task>)(async () =>
                 {
@@ -51,7 +51,7 @@ internal static class SmokeTest
                 {
                     await Task.Delay(20);
                     dispatcher.AssertAccess();
-                    await dispatcher.InvokeAsync((Action)(() => dispatcher.AssertAccess()));
+                    await dispatcher.InvokeAsync((Action)dispatcher.AssertAccess);
                     return 43;
                 })) == 43, "Asynchronous result");
             });
@@ -220,8 +220,7 @@ internal static class SmokeTest
         }
     }
 
-    private static Task<string?> ScriptAsync(MainWindow window, string script) =>
-        window.BlazorHost.View.WebView!.ExecuteScriptAsync(script);
+    private static Task<string?> ScriptAsync(MainWindow window, string script) => window.BlazorHost.View.WebView!.ExecuteScriptAsync(script);
 
     private static async Task NavigateAsync(MainWindow window, string route, string heading)
     {
@@ -236,12 +235,16 @@ internal static class SmokeTest
     {
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
         while (!await condition().WaitAsync(timeout.Token))
+        {
             await Task.Delay(50, timeout.Token);
+        }
     }
 
     private static void Require(bool condition, string message)
     {
         if (!condition)
+        {
             throw new InvalidOperationException(message);
+        }
     }
 }

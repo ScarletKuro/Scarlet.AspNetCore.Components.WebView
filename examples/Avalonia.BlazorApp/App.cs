@@ -2,7 +2,6 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Styling;
 using Avalonia.Themes.Fluent;
-using Microsoft.AspNetCore.Components.WebView.Win32Aot;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Avalonia.BlazorApp.Services;

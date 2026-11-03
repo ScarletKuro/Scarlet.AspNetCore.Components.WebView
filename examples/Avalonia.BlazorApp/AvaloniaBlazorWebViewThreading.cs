@@ -22,8 +22,11 @@ internal sealed class AvaloniaBlazorWebViewThreading : IBlazorWebViewThreading
     }
 
     public BlazorDispatcher Dispatcher { get; }
+
     public SynchronizationContext SynchronizationContext { get; }
+
     public bool CheckAccess() => Dispatcher.CheckAccess();
+
     public event EventHandler<BlazorWebViewUnhandledExceptionEventArgs>? UnhandledException;
 
     private void ReportException(Exception exception)

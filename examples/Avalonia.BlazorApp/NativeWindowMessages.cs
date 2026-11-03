@@ -49,7 +49,7 @@ internal sealed unsafe partial class NativeWindowMessages : IDisposable
     {
         if (_hwnd != 0)
         {
-            RemoveWindowSubclass(_hwnd, &WindowProc, SubclassId);
+            _ = RemoveWindowSubclass(_hwnd, &WindowProc, SubclassId);
             _hwnd = 0;
             _self.Free();
         }

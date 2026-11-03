@@ -1,7 +1,6 @@
 using Avalonia.Input;
 using Avalonia.Platform;
 using Avalonia.Controls;
-using Avalonia.Threading;
 using Avalonia.BlazorApp.Components;
 using RECT = DirectN.RECT;
 using Microsoft.AspNetCore.Components.WebView;
@@ -84,7 +83,9 @@ internal sealed class BlazorViewHost(IServiceProvider services, Action<BlazorWeb
     private void HandleWindowMessage(uint message)
     {
         if (_view is not { IsDisposed: false } view)
+        {
             return;
+        }
 
         switch (message)
         {
@@ -103,7 +104,9 @@ internal sealed class BlazorViewHost(IServiceProvider services, Action<BlazorWeb
     private void SynchronizeBounds()
     {
         if (_view is { IsDisposed: false } view && _nativeWindow is { } native)
+        {
             view.Bounds = native.ClientRect;
+        }
     }
 
     public void NotifyWindowMoved() => _view?.NotifyParentWindowPositionChanged();
@@ -111,7 +114,9 @@ internal sealed class BlazorViewHost(IServiceProvider services, Action<BlazorWeb
     public void SetWindowMinimized(bool minimized)
     {
         if (_view is { IsDisposed: false } view)
+        {
             view.IsVisible = !minimized && IsEffectivelyVisible;
+        }
     }
 
     protected override void OnGotFocus(FocusChangedEventArgs e)
@@ -125,7 +130,9 @@ internal sealed class BlazorViewHost(IServiceProvider services, Action<BlazorWeb
     {
         base.OnPropertyChanged(change);
         if (change.Property == IsVisibleProperty && _view is { IsDisposed: false } view)
+        {
             view.IsVisible = IsEffectivelyVisible;
+        }
     }
 
     // NativeControlHost's destruction callback is synchronous. Explicit disposal is awaited by MainWindow
