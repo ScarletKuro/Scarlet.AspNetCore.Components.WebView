@@ -30,12 +30,13 @@ internal sealed class BlazorViewHost(IServiceProvider services) : NativeControlH
         {
             _nativeWindow = new NativeWindowMessages(child.Handle, HandleWindowMessage,
                 ex => Dispatcher.Post(() => ReportException(ex)));
-            _view = new BlazorWebView(child.Handle, new AvaloniaBlazorDispatcher(Dispatcher, ReportDispatcherException))
+            _view = new BlazorWebView(child.Handle, new AvaloniaBlazorWebViewThreading(Dispatcher))
             {
                 HostPage = @"wwwroot\index.html",
                 Services = services,
                 Bounds = _nativeWindow.ClientRect,
             };
+            _view.UnhandledException += HandleUnhandledException;
             _view.RootComponents.Add<Counter>("#app");
             _view.UrlLoading += (_, e) =>
             {
@@ -166,10 +167,10 @@ internal sealed class BlazorViewHost(IServiceProvider services) : NativeControlH
         StatusChanged?.Invoke($"Error: {exception.Message}");
     }
 
-    private void ReportDispatcherException(Exception exception)
+    private void HandleUnhandledException(object? sender, BlazorWebViewUnhandledExceptionEventArgs e)
     {
-        // A callback can race with teardown. Its returned task still faults for awaiting callers.
-        if (_view is { IsDisposed: false })
-            ReportException(exception);
+        // This sample shows errors in the Avalonia status area and lets the application continue.
+        ReportException(e.Exception);
+        e.Handled = true;
     }
 }

@@ -1,5 +1,3 @@
-using System;
-
 namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 {
 	/// <summary>
@@ -7,9 +5,13 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 	/// </summary>
 	public class BlazorWebViewUnhandledExceptionEventArgs : EventArgs
 	{
-		internal BlazorWebViewUnhandledExceptionEventArgs(Exception exception)
+		/// <summary>
+		/// Creates event data for an exception reported by a threading integration.
+		/// </summary>
+		/// <param name="exception">The exception that was thrown.</param>
+		public BlazorWebViewUnhandledExceptionEventArgs(Exception exception)
 		{
-			Exception = exception;
+			Exception = exception ?? throw new ArgumentNullException(nameof(exception));
 		}
 
 		/// <summary>
@@ -19,8 +21,8 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 
 		/// <summary>
 		/// Gets or sets a value indicating whether the exception has been handled. When left <see langword="false"/>,
-		/// the exception is rethrown as an unhandled exception, which terminates the process
-		/// (matching the default behavior of WinForms and WPF).
+		/// the threading integration applies its host's unhandled-exception policy. The default DirectN integration
+		/// rethrows it as an unhandled exception, terminating the process.
 		/// </summary>
 		public bool Handled { get; set; }
 	}

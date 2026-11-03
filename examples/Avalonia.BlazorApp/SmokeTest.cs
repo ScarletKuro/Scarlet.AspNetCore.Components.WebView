@@ -1,6 +1,7 @@
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using Scarlet.DirectN.Threading;
+using Microsoft.AspNetCore.Components.WebView.Win32Aot;
 using WebView2.Utilities;
 
 namespace Avalonia.BlazorApp;
@@ -17,7 +18,7 @@ internal static class SmokeTest
             await window.BlazorHost.Ready.WaitAsync(TimeSpan.FromSeconds(30));
             await WaitUntilAsync(async () => await ScriptAsync(window, "document.body.dataset.ready === 'true'") == "true");
             Require(SynchronizationContext.Current is AvaloniaSynchronizationContext, "Avalonia context installed");
-            Require(DirectNMessageQueue.Current is null, "No DirectN queue created in host-dispatcher mode");
+            Require(DirectNMessageQueue.Current is null, "No DirectN queue created by the Avalonia threading integration");
             Require(await ScriptAsync(window, "document.getElementById('context').textContent") == "\"AvaloniaSynchronizationContext\"",
                 "Razor uses Avalonia context");
             report.Add("PASS: WebView2 and Razor initialized on Avalonia's context without a DirectN queue.");
@@ -50,23 +51,65 @@ internal static class SmokeTest
                 })) == 43, "Asynchronous result");
             });
             var reported = new TaskCompletionSource<Exception>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var adapter = new AvaloniaBlazorDispatcher(Dispatcher.UIThread, ex => reported.TrySetResult(ex));
             var expected = new InvalidOperationException("Expected dispatcher test failure");
-            await Task.Run(async () =>
+            void CaptureException(object? sender, BlazorWebViewUnhandledExceptionEventArgs e)
             {
+                Dispatcher.UIThread.VerifyAccess();
+                if (ReferenceEquals(e.Exception, expected))
+                    reported.TrySetResult(e.Exception);
+            }
+            window.BlazorHost.View.UnhandledException += CaptureException;
+            try
+            {
+                await Task.Run(async () =>
+                {
+                    try
+                    {
+                        await dispatcher.InvokeAsync((Func<Task>)(async () =>
+                        {
+                            await Task.Delay(20);
+                            throw expected;
+                        }));
+                        throw new InvalidOperationException("Dispatched exception was lost.");
+                    }
+                    catch (InvalidOperationException ex) when (ReferenceEquals(ex, expected)) { }
+                });
+                Require(ReferenceEquals(await reported.Task.WaitAsync(TimeSpan.FromSeconds(5)), expected), "UI exception reporting");
+            }
+            finally
+            {
+                window.BlazorHost.View.UnhandledException -= CaptureException;
+            }
+            report.Add("PASS: All four dispatcher overloads, inline dispatch, async results and BlazorWebView.UnhandledException.");
+
+            using (var integration = new AvaloniaBlazorWebViewThreading(Dispatcher.UIThread))
+            {
+                var hostFailure = new InvalidOperationException("Expected Avalonia unhandled exception");
+                var hostReported = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                void CaptureHostException(object? sender, DispatcherUnhandledExceptionEventArgs e)
+                {
+                    if (ReferenceEquals(e.Exception, hostFailure))
+                    {
+                        e.Handled = true;
+                        hostReported.TrySetResult();
+                    }
+                }
+                Dispatcher.UIThread.UnhandledException += CaptureHostException;
                 try
                 {
-                    await adapter.InvokeAsync((Func<Task>)(async () =>
+                    try
                     {
-                        await Task.Delay(20);
-                        throw expected;
-                    }));
-                    throw new InvalidOperationException("Dispatched exception was lost.");
+                        await integration.Dispatcher.InvokeAsync((Action)(() => throw hostFailure));
+                    }
+                    catch (InvalidOperationException ex) when (ReferenceEquals(ex, hostFailure)) { }
+                    await hostReported.Task.WaitAsync(TimeSpan.FromSeconds(5));
                 }
-                catch (InvalidOperationException ex) when (ReferenceEquals(ex, expected)) { }
-            });
-            Require(ReferenceEquals(await reported.Task.WaitAsync(TimeSpan.FromSeconds(5)), expected), "UI exception reporting");
-            report.Add("PASS: All four dispatcher overloads, inline dispatch, async results and exception reporting.");
+                finally
+                {
+                    Dispatcher.UIThread.UnhandledException -= CaptureHostException;
+                }
+            }
+            report.Add("PASS: Unhandled threading failures follow Avalonia's dispatcher exception policy.");
 
             var originalRect = window.BlazorHost.NativeClientRect;
             window.Width += 120;

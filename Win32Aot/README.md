@@ -90,14 +90,25 @@ DirectN application Blazor shares one queue, ordering and `SynchronizationContex
 thread has no `SynchronizationContext` yet, the view installs the queue's.
 
 When a UI framework should own scheduling as well as the message loop, use
-`new BlazorWebView(parentHwnd, dispatcher)` with an adapter implementing
-`Microsoft.AspNetCore.Components.Dispatcher`. Create it on the parent's STA UI thread after the host
-has installed its UI synchronization context. The supplied dispatcher must target that thread and keep
-asynchronous callbacks there. In this mode the view creates no DirectN queue and the host owns
-dispatcher exception reporting (including fire-and-forget failures), rather than the view's
-`UnhandledException` event. Keep the host's message loop alive until `DisposeAsync` completes.
+`new BlazorWebView(parentHwnd, threading)` with an implementation of `IBlazorWebViewThreading`.
+The interface supplies the Blazor `Dispatcher`, a UI `SynchronizationContext`, `CheckAccess` and an
+`UnhandledException` event. It uses Blazor's existing dispatcher abstraction rather than repeating its
+`InvokeAsync` methods. The default `DirectNBlazorWebViewThreading` implementation combines the shared
+DirectN queue with a view-specific `Win32Dispatcher`.
+
+Create one threading integration per view on the parent's STA UI thread. The view installs the supplied
+context only if the thread has none and forwards integration errors through `BlazorWebView.UnhandledException`.
+Set `Handled` there to handle a failure; otherwise the integration applies its host's exception policy.
+The default implementation rethrows unhandled failures; an Avalonia implementation can route them through
+Avalonia's dispatcher exception handling.
+
+The view owns the integration after successful construction and disposes it after WebView cleanup.
+Disposing the integration must detach that view's callbacks while leaving shared dispatchers, queues
+and synchronization contexts usable for other views and pending continuations. Do not share the same
+integration instance between views. Keep the host's message loop alive until `DisposeAsync` completes.
 See [the Windows Avalonia example](../examples/Avalonia.BlazorApp) for a `NativeControlHost` wrapper,
-dispatcher adapter, shared services and asynchronous shutdown.
+threading integration, shared services and asynchronous shutdown. Its threading implementation creates
+no DirectN message queue.
 
 ## API
 
@@ -107,7 +118,7 @@ folder, environment options, or a pre-created environment), `BlazorWebViewInitia
 `AddBlazorWebViewDeveloperTools`. On top of that:
 
 - `UnhandledException`: reports exceptions from work dispatched to the UI thread. Set `Handled` to keep the process
-  alive; otherwise the exception is rethrown as a normal unhandled exception.
+  alive; otherwise the threading integration applies its host's unhandled-exception policy.
 - `Bounds`, `IsVisible`, `MoveFocus`, `NotifyParentWindowPositionChanged`: control the WebView2 controller.
 - `WebView` / `Controller`: the underlying WebView2Aot `ICoreWebView2` / `ICoreWebView2Controller` objects.
 

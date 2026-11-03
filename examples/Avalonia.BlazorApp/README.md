@@ -19,11 +19,14 @@ the UI thread, verifies that the continuation uses `AvaloniaSynchronizationConte
 
 ## Integration
 
-- `AvaloniaBlazorDispatcher` adapts Avalonia's dispatcher to `Microsoft.AspNetCore.Components.Dispatcher`,
-  including all four `InvokeAsync` overloads, asynchronous results and exceptions. The host's dispatcher
-  must be supplied after Avalonia has installed its synchronization context.
+- `AvaloniaBlazorWebViewThreading` implements the host's public `IBlazorWebViewThreading` contract. It
+  supplies an Avalonia synchronization context, delegates `CheckAccess` to its dispatcher, and reports
+  failures through the integration's exception event. `AvaloniaBlazorDispatcher` adapts Avalonia's
+  dispatcher to Blazor's existing dispatcher abstraction, including all four `InvokeAsync` overloads,
+  asynchronous results and exceptions.
 - `BlazorViewHost` creates an Avalonia-owned child HWND and passes it, with the adapter, to
-  `new BlazorWebView(child.Handle, dispatcher)`. Avalonia positions and sizes this child in its layout.
+  `new BlazorWebView(child.Handle, new AvaloniaBlazorWebViewThreading(Dispatcher))`.
+  Avalonia positions and sizes this child in its layout.
 - `NativeWindowMessages` observes `WM_SIZE` and updates WebView2 bounds from `GetClientRect`: physical
   pixels, including DPI changes, rather than Avalonia's logical layout units. Child position and top-level
   window moves notify WebView2 so native popups stay positioned correctly. Focus can be forwarded into
@@ -32,10 +35,13 @@ the UI thread, verifies that the continuation uses `AvaloniaSynchronizationConte
   message loop and HWND remain alive while asynchronous Razor cleanup finishes. The component unsubscribes
   from the shared service and performs asynchronous cleanup. JS interop is used after rendering, not
   during component disposal: Win32Aot disconnects the IPC bridge before disposing components.
-- A supplied dispatcher owns its exception policy. The adapter reports dispatched failures in Avalonia's
-  status area and faults the returned task; these errors do not pass through the DirectN-backed
-  `BlazorWebView.UnhandledException` event. Callback failures racing with view disposal are not promoted
-  to the status area.
+- The view forwards integration failures to `BlazorWebView.UnhandledException`. The sample handles
+  this event, displays the error in Avalonia's status area, and sets `Handled`. Returned tasks still
+  fault for awaiting callers. Errors left unhandled are posted to Avalonia's dispatcher exception path.
+  Callback failures racing with view disposal are not promoted to the status area.
+- Each view owns one threading integration and disposes it after WebView cleanup. Integration disposal
+  detaches the view's callbacks; Avalonia's dispatcher, context and application loop stay alive. Other
+  views and already dispatched work can continue using the shared UI thread.
 
 The sample host has one lifetime: dispose it before permanently removing it from the visual tree, then
 create a new instance to attach again. Its synchronous native destruction callback also initiates
@@ -66,6 +72,7 @@ dotnet run --project examples/Avalonia.BlazorApp -c Release -- --smoke-test
 
 The opt-in test opens a real window and checks Razor/JS startup, the synchronization context, both
 directions of communication, worker dispatch, all dispatcher overloads and asynchronous failures,
-resize in both directions, browser viewport size, and awaited asynchronous component disposal.
+the view's exception event and Avalonia's unhandled-exception policy, resize in both directions,
+browser viewport size, and awaited asynchronous component disposal.
 It exits with code 0 on success or 1 on failure and writes `avalonia-smoke-test.log` beside the executable.
 Use `--smoke-test-output <path>` to choose another report location (its directory must exist).

@@ -60,6 +60,16 @@ internal static class Program
 		using var serviceProvider = services.BuildServiceProvider();
 
 		using var app = new Application { ExitOnLastWindowRemoved = false };
+		try
+		{
+			ThreadingTests.Run();
+			Console.WriteLine("PASS  Threading integration contract (access, exceptions, context and ownership)");
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"FAIL  Threading integration contract: {ex}");
+			return 1;
+		}
 
 		var scenarios = new (string Name, Action<IServiceProvider, int> Run)[]
 		{
