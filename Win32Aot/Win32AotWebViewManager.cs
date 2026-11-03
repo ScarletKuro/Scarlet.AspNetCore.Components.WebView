@@ -1,4 +1,4 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
 using System;
@@ -7,6 +7,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using HRESULT = DirectN.HRESULT;
@@ -55,6 +56,7 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 			""";
 
 		private static readonly Lock LoaderLock = new();
+		private static volatile bool s_loaderLoaded;
 
 		// HRESULT_FROM_WIN32(ERROR_INVALID_STATE): returned by WebView2 calls once the WebView has been closed,
 		// e.g. because its parent window was destroyed without the BlazorWebView being disposed.
@@ -495,13 +497,27 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 
 		private static void EnsureWebView2LoaderInitialized()
 		{
-			if (WebView2Utilities.IsInitialized)
+			if (s_loaderLoaded || WebView2Utilities.IsInitialized)
 			{
 				return;
 			}
 
 			lock (LoaderLock)
 			{
+				if (s_loaderLoaded || WebView2Utilities.IsInitialized)
+				{
+					return;
+				}
+
+				// The runtime's own native library search first, the one WebView2Aot's P/Invokes use. Besides the app directory and
+				// the deps.json runtimes\win-<arch>\native folder, it knows where a single-file app extracts its bundled native
+				// libraries (IncludeNativeLibrariesForSelfExtract, IncludeAllContentForSelfExtract), which WebView2Utilities doesn't.
+				if (NativeLibrary.TryLoad(WebView2Utilities.LoaderDllName, typeof(WebView2Utilities).Assembly, searchPath: null, out _))
+				{
+					s_loaderLoaded = true;
+					return;
+				}
+
 				// Probes resources embedded in the entry assembly, then <app dir> and <app dir>\runtimes\win-<arch>\native.
 				WebView2Utilities.Initialize(Assembly.GetEntryAssembly(), throwOnError: true);
 			}
