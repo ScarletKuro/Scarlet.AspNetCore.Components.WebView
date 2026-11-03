@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Components.WebView.Win32Aot;
 
 namespace Avalonia.BlazorApp;
 
-internal sealed class BlazorViewHost(IServiceProvider services) : NativeControlHost, IAsyncDisposable
+internal sealed class BlazorViewHost(IServiceProvider services, Action<BlazorWebView>? configureComponents = null) : NativeControlHost, IAsyncDisposable
 {
     private NativeWindowMessages? _nativeWindow;
     private BlazorWebView? _view;
@@ -37,7 +37,10 @@ internal sealed class BlazorViewHost(IServiceProvider services) : NativeControlH
                 Bounds = _nativeWindow.ClientRect,
             };
             _view.UnhandledException += HandleUnhandledException;
-            _view.RootComponents.Add<Counter>("#app");
+            if (configureComponents is null)
+                _view.RootComponents.Add<Routes>("#app");
+            else
+                configureComponents(_view);
             _view.UrlLoading += (_, e) =>
             {
                 if (e.Url.IsFile)

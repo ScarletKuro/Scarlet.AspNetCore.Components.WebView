@@ -1,8 +1,8 @@
-@implements IAsyncDisposable
+@page "/avalonia"
+@implements IDisposable
 @inject SharedCounter CounterState
-@inject IJSRuntime JS
 
-<main>
+<div class="integration-demo">
     <p class="eyebrow">BLAZOR HYBRID / WINDOWS</p>
     <h1>Blazor inside Avalonia</h1>
     <p>This is a local Razor component. There is no web server.</p>
@@ -10,7 +10,7 @@
     <section>
         <h2>Shared count: <span id="blazor-count">@CounterState.Count</span></h2>
         <p id="last-source">@CounterState.LastSource</p>
-        <button id="increment" @onclick="Increment">Send +1 to Avalonia</button>
+        <button class="btn" id="increment" @onclick="Increment">Send +1 to Avalonia</button>
     </section>
 
     <section>
@@ -18,7 +18,7 @@
         <dl>
             <dt>UI thread</dt><dd>@Environment.CurrentManagedThreadId</dd>
             <dt>Synchronization context</dt><dd id="context">@_context</dd>
-            <dt>Native AOT</dt><dd>@(!System.Runtime.CompilerServices.RuntimeFeature.IsDynamicCodeSupported ? "Yes" : "No")</dd>
+            <dt>Native AOT</dt><dd>@(System.Runtime.JitInfo.GetCompiledMethodCount() == 0 ? "Yes" : "No (JIT)")</dd>
         </dl>
         <p>Try the worker button in Avalonia. Its callback awaits a delay and then updates this component
             and the Avalonia controls on the same UI thread.</p>
@@ -26,7 +26,7 @@
 
     <label for="typing">Keyboard focus test</label>
     <input id="typing" placeholder="Type here after clicking Focus Blazor" />
-</main>
+</div>
 
 @code {
     private string _context = "";
@@ -34,25 +34,17 @@
     protected override void OnInitialized()
     {
         _context = SynchronizationContext.Current?.GetType().Name ?? "None";
+        CounterState.SetIntegrationPageActive(true);
         CounterState.Changed += OnCounterChanged;
-    }
-
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-            await JS.InvokeVoidAsync("sample.markReady");
     }
 
     private void Increment() => CounterState.Increment("Blazor button through shared DI service");
 
     private void OnCounterChanged() => _ = InvokeAsync(StateHasChanged);
 
-    public async ValueTask DisposeAsync()
+    public void Dispose()
     {
         CounterState.Changed -= OnCounterChanged;
-        // Asynchronous cleanup must finish before the native parent and Avalonia's message loop go away.
-        // Do not call JS here: the Win32Aot host disconnects the IPC bridge before disposing components.
-        await Task.Delay(75);
-        CounterState.NotifyComponentDisposed();
+        CounterState.SetIntegrationPageActive(false);
     }
 }

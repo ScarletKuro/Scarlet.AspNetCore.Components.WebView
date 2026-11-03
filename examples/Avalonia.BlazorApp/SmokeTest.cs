@@ -3,6 +3,8 @@ using Avalonia.Threading;
 using Scarlet.DirectN.Threading;
 using Microsoft.AspNetCore.Components.WebView.Win32Aot;
 using WebView2.Utilities;
+using System.Text.Json;
+using Avalonia.BlazorApp.Services;
 
 namespace Avalonia.BlazorApp;
 
@@ -19,6 +21,9 @@ internal static class SmokeTest
             await WaitUntilAsync(async () => await ScriptAsync(window, "document.body.dataset.ready === 'true'") == "true");
             Require(SynchronizationContext.Current is AvaloniaSynchronizationContext, "Avalonia context installed");
             Require(DirectNMessageQueue.Current is null, "No DirectN queue created by the Avalonia threading integration");
+            Require(!window.Counter.IsIntegrationPageActive, "Native demo controls are hidden on Home");
+            await NavigateAsync(window, "avalonia", "Blazor inside Avalonia");
+            Require(window.Counter.IsIntegrationPageActive, "Native demo controls are shown on the Avalonia page");
             Require(await ScriptAsync(window, "document.getElementById('context').textContent") == "\"AvaloniaSynchronizationContext\"",
                 "Razor uses Avalonia context");
             report.Add("PASS: WebView2 and Razor initialized on Avalonia's context without a DirectN queue.");
@@ -111,6 +116,56 @@ internal static class SmokeTest
             }
             report.Add("PASS: Unhandled threading failures follow Avalonia's dispatcher exception policy.");
 
+            await NavigateAsync(window, "counter", "Counter");
+            Require(!window.Counter.IsIntegrationPageActive, "Native demo controls hide when leaving the Avalonia page");
+            await ClickButtonAsync(window, "Click me");
+            await WaitUntilAsync(async () => await ScriptAsync(window, "document.querySelector('[role=status]').textContent") == "\"Current count: 1\"");
+
+            await NavigateAsync(window, "interop", "JS interop");
+            await ClickButtonAsync(window, "Read browser info");
+            await WaitUntilAsync(async () => await ScriptAsync(window, "document.querySelector('.info')?.textContent.includes('User agent') === true") == "true");
+            await ClickButtonAsync(window, "Ask JS to call .NET");
+            await WaitUntilAsync(async () => await ScriptAsync(window, "document.querySelector('[role=status]')?.textContent.includes('Called back from JavaScript') === true") == "true");
+
+            await NavigateAsync(window, "links", "Links");
+            await ScriptAsync(window, "document.querySelector('.links a[href=counter]').click()");
+            await WaitUntilAsync(async () => await ScriptAsync(window, "document.querySelector('h1')?.textContent") == "\"Counter\"");
+
+            await NavigateAsync(window, "errors", "Errors");
+            await ClickButtonAsync(window, "Throw in JavaScript");
+            await WaitUntilAsync(async () => await ScriptAsync(window, "document.querySelector('[role=status]')?.textContent.includes('Caught JS error:') === true") == "true");
+            await ClickButtonAsync(window, "Throw in an event handler");
+            await WaitUntilAsync(async () => await ScriptAsync(window, "document.querySelector('.error-boundary h2')?.textContent") == "\"Something went wrong\"");
+            await ClickButtonAsync(window, "Recover");
+            await WaitUntilAsync(async () => await ScriptAsync(window, "document.querySelector('h1')?.textContent") == "\"Errors\"");
+            report.Add("PASS: Sidebar navigation, counter, JS interop, internal links and error recovery.");
+
+            await NavigateAsync(window, "background", "Background work");
+            await ClickButtonAsync(window, "Open window (throws, DispatchExceptionAsync)");
+            await ClickButtonAsync(window, "Open window (no exception)");
+            await WaitUntilAsync(() => Task.FromResult(window.BackgroundWindows.Log.Count(entry => entry.Contains("background work started")) == 2));
+            var backgroundWindows = window.BackgroundWindows.OpenWindows.ToArray();
+            Require(backgroundWindows.Length == 2, "Background work opens Avalonia windows");
+            foreach (var child in backgroundWindows)
+                child.Close();
+            await Task.WhenAll(backgroundWindows.Select(child => child.ClosedTask)).WaitAsync(TimeSpan.FromSeconds(15));
+            await WaitUntilAsync(() => Task.FromResult(window.BackgroundWindows.Log.Count(entry => entry.Contains("background work finished")) == 2));
+            Require(!window.BackgroundWindows.Log.Any(entry => entry.Contains("UNHANDLED")), "No background exception escapes after window close");
+            foreach (var id in new[] { 1, 2 })
+            {
+                var log = window.BackgroundWindows.Log.ToList();
+                var closed = log.FindIndex(entry => entry.Contains($"#{id}: window closed"));
+                var finished = log.FindIndex(entry => entry.Contains($"#{id}: background work finished"));
+                Require(closed >= 0 && finished > closed, $"Window #{id} closed before its background work finished");
+            }
+            Require(DirectNMessageQueue.Current is null, "Background windows also use Avalonia's threading integration");
+            report.Add("PASS: Both background-work variants finish after their Avalonia windows close.");
+
+            await NavigateAsync(window, "", "Blazor in Avalonia");
+            await NavigateAsync(window, "avalonia", "Blazor inside Avalonia");
+            Require(window.Counter.Count == 3, "Shared state survives page navigation");
+            Require(!window.Counter.ComponentDisposed, "Page navigation does not dispose the root component");
+
             var originalRect = window.BlazorHost.NativeClientRect;
             window.Width += 120;
             window.Height += 80;
@@ -147,6 +202,8 @@ internal static class SmokeTest
         {
             exitCode = 1;
             report.Add($"FAIL: {ex}");
+            foreach (var child in window.BackgroundWindows.OpenWindows.ToArray())
+                child.Close();
             window.Close();
             try { await window.ClosedTask.WaitAsync(TimeSpan.FromSeconds(15)); }
             catch (Exception closeError) { report.Add($"Cleanup: {closeError}"); }
@@ -165,6 +222,15 @@ internal static class SmokeTest
 
     private static Task<string?> ScriptAsync(MainWindow window, string script) =>
         window.BlazorHost.View.WebView!.ExecuteScriptAsync(script);
+
+    private static async Task NavigateAsync(MainWindow window, string route, string heading)
+    {
+        await ScriptAsync(window, $"document.querySelector('nav a[href=\"{route}\"]').click()");
+        await WaitUntilAsync(async () => await ScriptAsync(window, "document.querySelector('h1')?.textContent") == JsonSerializer.Serialize(heading, AppJsonContext.Default.String));
+    }
+
+    private static async Task ClickButtonAsync(MainWindow window, string text) =>
+        await ScriptAsync(window, $"[...document.querySelectorAll('button')].find(b => b.textContent.trim() === {JsonSerializer.Serialize(text, AppJsonContext.Default.String)})?.click()");
 
     private static async Task WaitUntilAsync(Func<Task<bool>> condition)
     {

@@ -1,0 +1,15 @@
+@* Root component of the extra window. DispatchExceptionAsync needs an ErrorBoundary. *@
+<ErrorBoundary>
+    <ChildContent>
+        <BackgroundWorker WindowId="WindowId" ThrowException="ThrowException" />
+    </ChildContent>
+    <ErrorContent>
+        <p class="error-boundary">The background work failed and DispatchExceptionAsync reported it here.</p>
+    </ErrorContent>
+</ErrorBoundary>
+
+@code {
+    [Parameter] public int WindowId { get; set; }
+
+    [Parameter] public bool ThrowException { get; set; }
+}

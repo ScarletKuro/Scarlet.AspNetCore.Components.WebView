@@ -5,6 +5,7 @@ using Avalonia.Themes.Fluent;
 using Microsoft.AspNetCore.Components.WebView.Win32Aot;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Avalonia.BlazorApp.Services;
 
 namespace Avalonia.BlazorApp;
 
@@ -27,6 +28,9 @@ public sealed class App : Application
             services.AddBlazorWebViewDeveloperTools();
 #endif
             services.AddSingleton<SharedCounter>();
+            services.AddSingleton<HostEvents>();
+            services.AddSingleton<NativeDialogs>();
+            services.AddSingleton<BackgroundWorkWindows>();
             var provider = services.BuildServiceProvider();
             desktop.Exit += (_, _) => provider.Dispose();
             var window = new MainWindow(provider);

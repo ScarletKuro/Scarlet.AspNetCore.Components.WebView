@@ -1,32 +1,32 @@
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Threading;
+using Avalonia.BlazorApp.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Avalonia.BlazorApp;
 
-internal sealed class MainWindow : Window
+internal sealed class MainWindow : BlazorWindow
 {
     private readonly TextBlock _count = new() { FontSize = 28 };
     private readonly TextBlock _source = new() { TextWrapping = Media.TextWrapping.Wrap };
     private readonly TextBlock _status = new() { TextWrapping = Media.TextWrapping.Wrap };
-    private bool _closing;
-    private bool _allowClose;
+    private readonly StackPanel _integrationPanel;
 
-    public BlazorViewHost BlazorHost { get; }
     public SharedCounter Counter { get; }
-    public Task ClosedTask => _closed.Task;
-    private readonly TaskCompletionSource _closed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public BackgroundWorkWindows BackgroundWindows { get; }
 
-    public MainWindow(IServiceProvider services)
+    public MainWindow(IServiceProvider services) : base(services)
     {
+        // Reuse the base window's host inside the main window's surrounding Avalonia layout.
+        Content = null;
         Title = "Avalonia + Win32Aot BlazorWebView";
-        Width = 1100;
-        Height = 740;
-        MinWidth = 760;
+        Width = 1280;
+        Height = 800;
+        MinWidth = 1000;
         MinHeight = 520;
         Counter = services.GetRequiredService<SharedCounter>();
-        BlazorHost = new BlazorViewHost(services) { Focusable = true };
+        BackgroundWindows = services.GetRequiredService<BackgroundWorkWindows>();
         BlazorHost.StatusChanged += SetStatus;
 
         var increment = new Button { Content = "Send +1 to Blazor", HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -44,40 +44,44 @@ internal sealed class MainWindow : Window
         var focus = new Button { Content = "Focus Blazor", HorizontalAlignment = HorizontalAlignment.Stretch };
         focus.Click += (_, _) => BlazorHost.Focus();
 
-        var sidebar = new StackPanel
+        _integrationPanel = new StackPanel
         {
-            Margin = new Thickness(24),
+            Margin = new Thickness(20),
+            Width = 240,
+            IsVisible = false,
             Spacing = 16,
             Children =
             {
                 new TextBlock { Text = "Avalonia controls", FontSize = 22 },
                 new TextBlock { Text = "One UI thread, Avalonia's dispatcher, and a shared .NET service.", TextWrapping = Media.TextWrapping.Wrap },
                 _count, _source, increment, background, focus,
-                new TextBlock { Text = "The pane on the right contains local Razor components hosted by WebView2Aot.", TextWrapping = Media.TextWrapping.Wrap },
-                _status,
+                new TextBlock { Text = "These controls share state with the Blazor integration page. Navigate away to return to the standard example layout.", TextWrapping = Media.TextWrapping.Wrap },
             },
         };
-        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("320,*") };
-        grid.Children.Add(sidebar);
+        var grid = new Grid { ColumnDefinitions = new ColumnDefinitions("Auto,*"), RowDefinitions = new RowDefinitions("*,Auto") };
+        grid.Children.Add(_integrationPanel);
         Grid.SetColumn(BlazorHost, 1);
         grid.Children.Add(BlazorHost);
+        var statusBar = new Border { Padding = new Thickness(16, 8), Child = _status };
+        Grid.SetRow(statusBar, 1);
+        Grid.SetColumnSpan(statusBar, 2);
+        grid.Children.Add(statusBar);
         Content = grid;
 
         Counter.Changed += UpdateCounter;
         UpdateCounter();
         SetStatus("Starting WebView2...");
-        PositionChanged += (_, _) => BlazorHost.NotifyWindowMoved();
-        PropertyChanged += (_, e) =>
+        Activated += async (_, _) =>
         {
-            if (e.Property == WindowStateProperty)
-                BlazorHost.SetWindowMinimized(WindowState == WindowState.Minimized);
+            try
+            {
+                await BlazorHost.Ready;
+                await BlazorHost.View.TryDispatchAsync(sp => sp.GetRequiredService<HostEvents>().NotifyActivated());
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { SetStatus($"Error: {ex.Message}"); }
         };
-        Closing += OnClosing;
-        Closed += (_, _) =>
-        {
-            Counter.Changed -= UpdateCounter;
-            _closed.TrySetResult();
-        };
+        Closed += (_, _) => Counter.Changed -= UpdateCounter;
     }
 
     public async Task IncrementFromAvaloniaAsync()
@@ -111,44 +115,12 @@ internal sealed class MainWindow : Window
         Dispatcher.VerifyAccess();
         _count.Text = $"Shared count: {Counter.Count}";
         _source.Text = $"Last update: {Counter.LastSource}";
+        _integrationPanel.IsVisible = Counter.IsIntegrationPageActive;
     }
 
     private void SetStatus(string text)
     {
         Dispatcher.VerifyAccess();
         _status.Text = text;
-    }
-
-    private void OnClosing(object? sender, WindowClosingEventArgs e)
-    {
-        if (_allowClose)
-            return;
-
-        // Keep the window, native parent and message loop alive until Razor/JS disposal has completed.
-        e.Cancel = true;
-        if (!_closing)
-        {
-            _closing = true;
-            _ = DisposeThenCloseAsync();
-        }
-    }
-
-    private async Task DisposeThenCloseAsync()
-    {
-        try
-        {
-            SetStatus("Disposing Razor components before closing...");
-            await BlazorHost.DisposeAsync();
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Trace.TraceError(ex.ToString());
-        }
-        finally
-        {
-            _allowClose = true;
-            // Close outside the current Closing event, even if disposal completed synchronously.
-            Dispatcher.Post(Close);
-        }
     }
 }

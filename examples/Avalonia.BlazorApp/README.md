@@ -12,7 +12,22 @@ Requires Windows, the .NET 10 SDK and the WebView2 Runtime.
 dotnet run --project examples/Avalonia.BlazorApp
 ```
 
-Use **Send +1 to Blazor** in Avalonia and **Send +1 to Avalonia** in the Razor component to update both
+The Blazor sidebar has the same test pages as the other example apps:
+
+| Page | Demonstrates |
+| --- | --- |
+| Home | Runtime information and window activations pushed from Avalonia through `TryDispatchAsync`. |
+| Counter | Rendering and event handling. |
+| JS interop | .NET to JS with source-generated JSON metadata, JS callbacks to .NET, and a native Win32 message box. |
+| Links | Internal navigation, external links, `target="_blank"`, and cancellation of `file://` navigation. |
+| Errors | The layout's `ErrorBoundary`, recovery, and caught JavaScript errors. |
+| Background work | Avalonia windows closed while their Razor components keep working and dispatch after disposal. |
+| Blazor inside Avalonia | Shared state, native Avalonia controls, UI context and worker dispatch. |
+
+The native Avalonia controls appear only on **Blazor inside Avalonia**. Other pages use the full window
+width, and shared counter state survives navigation. The Avalonia status bar remains visible on every page.
+
+On that page, use **Send +1 to Blazor** in Avalonia and **Send +1 to Avalonia** in the Razor component to update both
 panes through a shared DI service. The Avalonia button uses `BlazorWebView.TryDispatchAsync` to access
 Blazor's scoped services. **Update from a worker** dispatches from the thread pool, awaits a delay on
 the UI thread, verifies that the continuation uses `AvaloniaSynchronizationContext`, then updates both panes.
@@ -31,9 +46,11 @@ the UI thread, verifies that the continuation uses `AvaloniaSynchronizationConte
   pixels, including DPI changes, rather than Avalonia's logical layout units. Child position and top-level
   window moves notify WebView2 so native popups stay positioned correctly. Focus can be forwarded into
   WebView2, and minimizing the main window hides the controller.
-- `MainWindow` cancels its first close, awaits `BlazorViewHost.DisposeAsync`, then closes again. Its
-  message loop and HWND remain alive while asynchronous Razor cleanup finishes. The component unsubscribes
-  from the shared service and performs asynchronous cleanup. JS interop is used after rendering, not
+- `BlazorWindow` provides the common window lifetime for the main window and background-work windows:
+  it cancels its first close, awaits `BlazorViewHost.DisposeAsync`, then closes again. Its
+  message loop and HWND remain alive while asynchronous Razor cleanup finishes. The root `Routes` component
+  performs asynchronous cleanup, while individual pages unsubscribe from shared services when navigated away.
+  JS interop is used after rendering, not
   during component disposal: Win32Aot disconnects the IPC bridge before disposing components.
 - The view forwards integration failures to `BlazorWebView.UnhandledException`. The sample handles
   this event, displays the error in Avalonia's status area, and sets `Handled`. Returned tasks still
@@ -72,7 +89,8 @@ dotnet run --project examples/Avalonia.BlazorApp -c Release -- --smoke-test
 
 The opt-in test opens a real window and checks Razor/JS startup, the synchronization context, both
 directions of communication, worker dispatch, all dispatcher overloads and asynchronous failures,
-the view's exception event and Avalonia's unhandled-exception policy, resize in both directions,
-browser viewport size, and awaited asynchronous component disposal.
+the view's exception event and Avalonia's unhandled-exception policy. It also navigates the sidebar,
+exercises the counter, JS interop, links and error recovery, closes both background-work window variants,
+checks resize in both directions and browser viewport size, and verifies asynchronous root component disposal.
 It exits with code 0 on success or 1 on failure and writes `avalonia-smoke-test.log` beside the executable.
 Use `--smoke-test-output <path>` to choose another report location (its directory must exist).
