@@ -9,7 +9,6 @@ public sealed record BrowserInfo(string UserAgent, string Language, int ScreenWi
 /// </summary>
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(BrowserInfo))]
-[JsonSerializable(typeof(string))]
 internal sealed partial class AppJsonContext : JsonSerializerContext
 {
 }

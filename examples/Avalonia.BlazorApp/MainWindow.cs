@@ -1,7 +1,9 @@
 using Avalonia.Controls;
 using Avalonia.Layout;
 using Avalonia.Threading;
+using Avalonia.BlazorApp.Components;
 using Avalonia.BlazorApp.Services;
+using Microsoft.AspNetCore.Components.WebView.Win32Aot;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Avalonia.BlazorApp;
@@ -16,7 +18,7 @@ internal sealed class MainWindow : BlazorWindow
     public SharedCounter Counter { get; }
     public BackgroundWorkWindows BackgroundWindows { get; }
 
-    public MainWindow(IServiceProvider services) : base(services)
+    public MainWindow(IServiceProvider services) : base(services, view => view.RootComponents.Add<Routes>("#app"))
     {
         // Reuse the base window's host inside the main window's surrounding Avalonia layout.
         Content = null;

@@ -63,6 +63,8 @@ CI runs, for each host, on a Windows runner with real windows:
 - `tests/<Host>.LifetimeTests`: windows closed, destroyed or never disposed while a component keeps working in the
   background and then calls `InvokeAsync`/`DispatchExceptionAsync` (dotnet/maui#34855). No exception may reach the
   app's unhandled exception handler. Win32Aot runs them both with the JIT and as a NativeAOT executable.
+  `Avalonia.LifetimeTests` runs them on the Avalonia example's host, and also checks that closing a window awaits
+  component disposal, that WebView2 follows Avalonia's layout, and dispatching through Avalonia's dispatcher.
 - `tests/ui/Test-BlazorApp.ps1`: drives the published example through UI Automation (pages, clicks, JS interop, the
   background work page, clean exit).
 

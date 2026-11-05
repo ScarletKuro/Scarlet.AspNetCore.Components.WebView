@@ -48,10 +48,9 @@ the UI thread, verifies that the continuation uses `AvaloniaSynchronizationConte
   WebView2, and minimizing the main window hides the controller.
 - `BlazorWindow` provides the common window lifetime for the main window and background-work windows:
   it cancels its first close, awaits `BlazorViewHost.DisposeAsync`, then closes again. Its
-  message loop and HWND remain alive while asynchronous Razor cleanup finishes. The root `Routes` component
-  performs asynchronous cleanup, while individual pages unsubscribe from shared services when navigated away.
-  JS interop is used after rendering, not
-  during component disposal: Win32Aot disconnects the IPC bridge before disposing components.
+  message loop and HWND remain alive while asynchronous Razor cleanup finishes. Pages unsubscribe from shared
+  services when navigated away. JS interop is used after rendering, not during component disposal: Win32Aot
+  disconnects the IPC bridge before disposing components.
 - The view forwards integration failures to `BlazorWebView.UnhandledException`. The sample handles
   this event, displays the error in Avalonia's status area, and sets `Handled`. Returned tasks still
   fault for awaiting callers. Errors left unhandled are posted to Avalonia's dispatcher exception path.
@@ -79,24 +78,14 @@ Blazor's dependencies can produce trim/AOT warnings. The project explicitly impo
 build props and targets because it consumes the host through a project reference; NuGet consumers receive
 these imports automatically.
 
-## Integration smoke test
+## Tests
+
+Like the other examples, the published app is driven through UI Automation by
+[`tests/ui/Test-BlazorApp.ps1`](../../tests/ui/Test-BlazorApp.ps1):
 
 ```powershell
-dotnet run --project examples/Avalonia.BlazorApp -c Release -- --smoke-test
-# Reproduce a desktop that constrains the window below its preferred startup size:
-dotnet run --project examples/Avalonia.BlazorApp -c Release -- --smoke-test --smoke-test-constrained-window
-# Or test the actual published native executable:
-./artifacts/avalonia-example/Avalonia.BlazorApp.exe --smoke-test
+powershell -File tests/ui/Test-BlazorApp.ps1 -Exe artifacts/avalonia-example/Avalonia.BlazorApp.exe -HomeHeading 'Blazor in Avalonia' -ExpectNativeAot
 ```
 
-The opt-in test opens a real window and checks Razor/JS startup, the synchronization context, both
-directions of communication, worker dispatch, all dispatcher overloads and asynchronous failures,
-the view's exception event and Avalonia's unhandled-exception policy. It also navigates the sidebar,
-exercises the counter, JS interop, links and error recovery, closes both background-work window variants,
-checks resize in both directions and browser viewport size, and verifies asynchronous root component disposal.
-The resize check waits for Avalonia layout, the native child HWND and WebView2 bounds to agree, then shrinks
-and restores the actual client size. It does not require the desktop to allow growth beyond the startup size.
-The constrained-window mode caps the window at 1000 by 650 logical units and runs the same checks.
-Resize timeouts include the client, layout, HWND and controller sizes, DPI scale and window limits.
-It exits with code 0 on success or 1 on failure and writes `avalonia-smoke-test.log` beside the executable.
-Use `--smoke-test-output <path>` to choose another report location (its directory must exist).
+[`tests/Avalonia.LifetimeTests`](../../tests/Avalonia.LifetimeTests) runs this example's `BlazorViewHost` and
+`BlazorWindow` through the lifetime scenarios of the other hosts, plus resizing and the Avalonia dispatcher.

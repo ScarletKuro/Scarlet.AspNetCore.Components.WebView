@@ -7,7 +7,6 @@ public sealed class SharedCounter
 {
     public int Count { get; private set; }
     public string LastSource { get; private set; } = "Neither side yet";
-    public bool ComponentDisposed { get; private set; }
     public bool IsIntegrationPageActive { get; private set; }
     public event Action? Changed;
 
@@ -17,12 +16,6 @@ public sealed class SharedCounter
         Count++;
         LastSource = source;
         Changed?.Invoke();
-    }
-
-    public void NotifyComponentDisposed()
-    {
-        Dispatcher.UIThread.VerifyAccess();
-        ComponentDisposed = true;
     }
 
     public void SetIntegrationPageActive(bool active)

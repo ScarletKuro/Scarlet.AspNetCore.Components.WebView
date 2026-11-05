@@ -8,12 +8,10 @@ namespace Avalonia.BlazorApp.Services;
 public sealed class BackgroundWorkWindows(IServiceProvider services, NativeDialogs dialogs)
 {
     private readonly List<string> _log = [];
-    private readonly List<BlazorWindow> _windows = [];
     private int _nextId;
 
     public event Action? Changed;
     public IReadOnlyList<string> Log => _log;
-    internal IReadOnlyList<BlazorWindow> OpenWindows => _windows;
 
     public void Open(bool throwException)
     {
@@ -38,12 +36,7 @@ public sealed class BackgroundWorkWindows(IServiceProvider services, NativeDialo
             Width = 560,
             Height = 360,
         };
-        _windows.Add(window);
-        window.Closed += (_, _) =>
-        {
-            _windows.Remove(window);
-            Add($"#{id}: window closed");
-        };
+        window.Closed += (_, _) => Add($"#{id}: window closed");
         Add($"#{id}: opened ({(throwException ? "throws, then DispatchExceptionAsync" : "no exception")})");
         window.Show();
     }

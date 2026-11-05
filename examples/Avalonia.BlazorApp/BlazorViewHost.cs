@@ -1,14 +1,13 @@
 using Avalonia.Input;
 using Avalonia.Platform;
 using Avalonia.Controls;
-using Avalonia.BlazorApp.Components;
 using RECT = DirectN.RECT;
 using Microsoft.AspNetCore.Components.WebView;
 using Microsoft.AspNetCore.Components.WebView.Win32Aot;
 
 namespace Avalonia.BlazorApp;
 
-internal sealed class BlazorViewHost(IServiceProvider services, Action<BlazorWebView>? configureComponents = null) : NativeControlHost, IAsyncDisposable
+internal sealed class BlazorViewHost(IServiceProvider services, Action<BlazorWebView> configureComponents) : NativeControlHost, IAsyncDisposable
 {
     private NativeWindowMessages? _nativeWindow;
     private BlazorWebView? _view;
@@ -36,10 +35,7 @@ internal sealed class BlazorViewHost(IServiceProvider services, Action<BlazorWeb
                 Bounds = _nativeWindow.ClientRect,
             };
             _view.UnhandledException += HandleUnhandledException;
-            if (configureComponents is null)
-                _view.RootComponents.Add<Routes>("#app");
-            else
-                configureComponents(_view);
+            configureComponents(_view);
             _view.UrlLoading += (_, e) =>
             {
                 if (e.Url.IsFile)

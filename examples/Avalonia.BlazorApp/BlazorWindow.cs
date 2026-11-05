@@ -13,7 +13,7 @@ internal class BlazorWindow : Window
     public BlazorViewHost BlazorHost { get; }
     public Task ClosedTask => _closed.Task;
 
-    public BlazorWindow(IServiceProvider services, Action<BlazorWebView>? configureComponents = null)
+    public BlazorWindow(IServiceProvider services, Action<BlazorWebView> configureComponents)
     {
         BlazorHost = new BlazorViewHost(services, configureComponents) { Focusable = true };
         Content = BlazorHost;

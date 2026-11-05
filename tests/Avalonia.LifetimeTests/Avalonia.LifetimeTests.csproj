@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk.Razor">
+
+  <!-- A NuGet consumer gets these imports automatically from the package's build folder. -->
+  <Import Project="..\..\Win32Aot\build\Scarlet.AspNetCore.Components.WebView.Win32Aot.props" />
+
+  <PropertyGroup>
+    <!-- Console app so the scenario report is visible; the windows are still Avalonia windows. -->
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Avalonia.LifetimeTests</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- NativeControlHost needs the supported OS list. -->
+    <ApplicationManifest>..\..\examples\Avalonia.BlazorApp\app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Win32Aot\Microsoft.AspNetCore.Components.WebView.Win32Aot.csproj" />
+    <ProjectReference Include="..\LifetimeTests.Components\LifetimeTests.Components.csproj" />
+    <PackageReference Include="Avalonia.Desktop" Version="12.1.5" />
+    <PackageReference Include="Avalonia.Themes.Fluent" Version="12.1.5" />
+  </ItemGroup>
+
+  <!-- The example's host code, tested as users copy it. -->
+  <ItemGroup>
+    <Compile Include="..\..\examples\Avalonia.BlazorApp\AvaloniaBlazorDispatcher.cs" Link="Example\AvaloniaBlazorDispatcher.cs" />
+    <Compile Include="..\..\examples\Avalonia.BlazorApp\AvaloniaBlazorWebViewThreading.cs" Link="Example\AvaloniaBlazorWebViewThreading.cs" />
+    <Compile Include="..\..\examples\Avalonia.BlazorApp\BlazorViewHost.cs" Link="Example\BlazorViewHost.cs" />
+    <Compile Include="..\..\examples\Avalonia.BlazorApp\BlazorWindow.cs" Link="Example\BlazorWindow.cs" />
+    <Compile Include="..\..\examples\Avalonia.BlazorApp\NativeWindowMessages.cs" Link="Example\NativeWindowMessages.cs" />
+  </ItemGroup>
+
+  <Import Project="..\..\Win32Aot\build\Scarlet.AspNetCore.Components.WebView.Win32Aot.targets" />
+
+</Project>

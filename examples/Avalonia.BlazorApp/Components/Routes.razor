@@ -1,26 +1,6 @@
-@inject IJSRuntime JS
-@inject SharedCounter CounterState
-@implements IAsyncDisposable
-
 <Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
         <RouteView RouteData="routeData" DefaultLayout="typeof(MainLayout)" />
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
 </Router>
-
-@code {
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-            await JS.InvokeVoidAsync("sample.markReady");
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        // Keep this cleanup on the root component so navigation does not count as window disposal.
-        // JS interop is unavailable here because the host has disconnected the IPC bridge.
-        await Task.Delay(75);
-        CounterState.NotifyComponentDisposed();
-    }
-}

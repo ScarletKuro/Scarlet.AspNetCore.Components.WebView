@@ -32,20 +32,7 @@ public sealed class App : Application
             services.AddSingleton<BackgroundWorkWindows>();
             var provider = services.BuildServiceProvider();
             desktop.Exit += (_, _) => provider.Dispose();
-            var window = new MainWindow(provider);
-            desktop.MainWindow = window;
-
-            if (desktop.Args?.Contains("--smoke-test") == true)
-            {
-                // Exercise the same resize path on desktops that cannot fit the example's preferred size.
-                if (desktop.Args.Contains("--smoke-test-constrained-window"))
-                {
-                    window.MaxWidth = 1000;
-                    window.MaxHeight = 650;
-                }
-                desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-                window.Opened += (_, _) => _ = SmokeTest.RunAsync(window, desktop);
-            }
+            desktop.MainWindow = new MainWindow(provider);
         }
 
         base.OnFrameworkInitializationCompleted();

@@ -30,7 +30,6 @@
     private async Task RunBackgroundWork()
     {
         _loading = true;
-        Windows.Add($"#{WindowId}: background work started");
         await InvokeAsync(StateHasChanged);
 
         try

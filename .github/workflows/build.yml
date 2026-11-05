@@ -81,43 +81,6 @@ jobs:
         timeout-minutes: 10
         run: dotnet run --project tests/Win32Aot.LifetimeTests/Win32Aot.LifetimeTests.csproj -c Release
 
-      - name: Avalonia integration smoke test (JIT)
-        shell: pwsh
-        timeout-minutes: 5
-        run: |
-          dotnet run --project examples/Avalonia.BlazorApp/Avalonia.BlazorApp.csproj -c Release -- --smoke-test --smoke-test-output "$PWD/artifacts/avalonia-smoke-jit.log"
-          $testExitCode = $LASTEXITCODE
-          Get-Content artifacts/avalonia-smoke-jit.log -ErrorAction SilentlyContinue
-          exit $testExitCode
-
-      - name: Avalonia constrained-window smoke test (JIT)
-        shell: pwsh
-        timeout-minutes: 5
-        run: |
-          dotnet run --project examples/Avalonia.BlazorApp/Avalonia.BlazorApp.csproj -c Release --no-build -- --smoke-test --smoke-test-constrained-window --smoke-test-output "$PWD/artifacts/avalonia-smoke-jit-constrained.log"
-          $testExitCode = $LASTEXITCODE
-          Get-Content artifacts/avalonia-smoke-jit-constrained.log -ErrorAction SilentlyContinue
-          exit $testExitCode
-
-      - name: Avalonia integration smoke test (NativeAOT)
-        shell: pwsh
-        timeout-minutes: 15
-        run: |
-          dotnet publish examples/Avalonia.BlazorApp/Avalonia.BlazorApp.csproj -c Release -r win-x64 -o artifacts/avalonia-example
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          artifacts/avalonia-example/Avalonia.BlazorApp.exe --smoke-test --smoke-test-output "$PWD/artifacts/avalonia-smoke-native.log"
-          $testExitCode = $LASTEXITCODE
-          Get-Content artifacts/avalonia-smoke-native.log -ErrorAction SilentlyContinue
-          exit $testExitCode
-
-      - name: Upload Avalonia integration reports
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: avalonia-integration-reports
-          path: artifacts/avalonia-smoke-*.log
-          if-no-files-found: ignore
-
       - name: Lifetime tests (NativeAOT)
         shell: pwsh
         timeout-minutes: 15
@@ -198,5 +161,47 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.host }}-ui-test-screenshots
+          path: artifacts/ui-test/
+          if-no-files-found: ignore
+
+  # The Avalonia example hosts Win32Aot in a NativeControlHost: its lifetime scenarios, and the same UI smoke test
+  # against its NativeAOT build.
+  avalonia-tests:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Lifetime tests
+        shell: pwsh
+        timeout-minutes: 10
+        run: dotnet run --project tests/Avalonia.LifetimeTests/Avalonia.LifetimeTests.csproj -c Release
+
+      - name: Publish example with NativeAOT
+        shell: pwsh
+        run: dotnet publish examples/Avalonia.BlazorApp/Avalonia.BlazorApp.csproj -c Release -r win-x64 -o artifacts/avalonia-example
+
+      - name: UI smoke test of the NativeAOT example
+        shell: powershell
+        timeout-minutes: 10
+        run: |
+          foreach ($attempt in 1, 2) {
+            powershell -NoProfile -ExecutionPolicy Bypass -File tests/ui/Test-BlazorApp.ps1 -Exe artifacts/avalonia-example/Avalonia.BlazorApp.exe -HomeHeading 'Blazor in Avalonia' -OutDir "artifacts/ui-test/attempt-$attempt" -ExpectNativeAot
+            if ($LASTEXITCODE -eq 0) { exit 0 }
+            Write-Host "::warning::UI smoke test attempt $attempt failed"
+          }
+          exit 1
+
+      - name: Upload UI test screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: avalonia-ui-test-screenshots
           path: artifacts/ui-test/
           if-no-files-found: ignore
