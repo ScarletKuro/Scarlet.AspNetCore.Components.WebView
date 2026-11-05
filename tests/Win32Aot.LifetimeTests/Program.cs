@@ -63,11 +63,11 @@ internal static class Program
 		try
 		{
 			ThreadingTests.Run();
-			Console.WriteLine("PASS  Threading integration contract (access, exceptions, context and ownership)");
+			Console.WriteLine("PASS  Host dispatcher (thread checks, context, exceptions, lifetime)");
 		}
 		catch (Exception ex)
 		{
-			Console.WriteLine($"FAIL  Threading integration contract: {ex}");
+			Console.WriteLine($"FAIL  Host dispatcher: {ex}");
 			return 1;
 		}
 

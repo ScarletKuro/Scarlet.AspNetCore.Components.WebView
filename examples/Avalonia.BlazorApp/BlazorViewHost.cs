@@ -28,7 +28,7 @@ internal sealed class BlazorViewHost(IServiceProvider services, Action<BlazorWeb
 		{
 			_nativeWindow = new NativeWindowMessages(child.Handle, HandleWindowMessage,
 				ex => Dispatcher.Post(() => ReportException(ex)));
-			_view = new BlazorWebView(child.Handle, new AvaloniaBlazorWebViewThreading(Dispatcher))
+			_view = new BlazorWebView(child.Handle, new AvaloniaUiDispatcher(Dispatcher))
 			{
 				HostPage = @"wwwroot\index.html",
 				Services = services,

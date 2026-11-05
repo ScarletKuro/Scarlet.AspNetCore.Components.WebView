@@ -24,8 +24,7 @@
 
   <!-- The example's host code, tested as users copy it. -->
   <ItemGroup>
-    <Compile Include="..\..\examples\Avalonia.BlazorApp\AvaloniaBlazorDispatcher.cs" Link="Example\AvaloniaBlazorDispatcher.cs" />
-    <Compile Include="..\..\examples\Avalonia.BlazorApp\AvaloniaBlazorWebViewThreading.cs" Link="Example\AvaloniaBlazorWebViewThreading.cs" />
+    <Compile Include="..\..\examples\Avalonia.BlazorApp\AvaloniaUiDispatcher.cs" Link="Example\AvaloniaUiDispatcher.cs" />
     <Compile Include="..\..\examples\Avalonia.BlazorApp\BlazorViewHost.cs" Link="Example\BlazorViewHost.cs" />
     <Compile Include="..\..\examples\Avalonia.BlazorApp\BlazorWindow.cs" Link="Example\BlazorWindow.cs" />
     <Compile Include="..\..\examples\Avalonia.BlazorApp\NativeWindowMessages.cs" Link="Example\NativeWindowMessages.cs" />

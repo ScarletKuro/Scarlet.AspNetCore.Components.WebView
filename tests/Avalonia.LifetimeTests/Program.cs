@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 using Avalonia;
 using Avalonia.BlazorApp;
 using Avalonia.Controls;
@@ -23,10 +25,49 @@ namespace Avalonia.LifetimeTests;
 internal static class Program
 {
 	[STAThread]
-	private static int Main(string[] args) => AppBuilder.Configure(() => new TestApp(new LifetimeTestRunner(args)))
-		.UsePlatformDetect()
-		.LogToTrace()
-		.StartWithClassicDesktopLifetime(args);
+	private static int Main(string[] args)
+	{
+		var exitCode = AppBuilder.Configure(() => new TestApp(new LifetimeTestRunner(args)))
+			.UsePlatformDetect()
+			.LogToTrace()
+			.StartWithClassicDesktopLifetime(args);
+		return ShutdownFlood.Verify() ? exitCode : 1;
+	}
+}
+
+/// <summary>
+/// Work dispatched through a view while the app shuts down: every invocation must run or fault, none may stay pending.
+/// </summary>
+internal static class ShutdownFlood
+{
+	private static readonly ConcurrentQueue<Task> s_invocations = new();
+	private static int s_ran;
+	private static volatile bool s_stop;
+
+	public static void Start(Microsoft.AspNetCore.Components.Dispatcher dispatcher) => new Thread(() =>
+	{
+		while (!s_stop)
+		{
+			s_invocations.Enqueue(dispatcher.InvokeAsync(() => { Interlocked.Increment(ref s_ran); }));
+		}
+	}) { IsBackground = true }.Start();
+
+	// After the UI loop has ended: keep dispatching for a moment, then account for every invocation.
+	public static bool Verify()
+	{
+		Thread.Sleep(300);
+		s_stop = true;
+		Thread.Sleep(100);
+		var all = s_invocations.ToArray();
+		SpinWait.SpinUntil(() => all.All(t => t.IsCompleted), TimeSpan.FromSeconds(10));
+		var ran = all.Count(t => t.Status == TaskStatus.RanToCompletion);
+		var faulted = all.Count(t => t.IsFaulted && t.Exception!.InnerException is InvalidOperationException);
+		var pending = all.Count(t => !t.IsCompleted);
+		var passed = all.Length > 0 && pending == 0 && ran + faulted == all.Length && ran == Volatile.Read(ref s_ran) && faulted > 0;
+		Console.WriteLine($"{(passed ? "PASS" : "FAIL")}  Shutdown while work is dispatched through a view");
+		Console.WriteLine($"      {all.Length} invocations: {ran} ran, {faulted} faulted, {pending} pending, {all.Length - ran - faulted - pending} other");
+		return passed;
+	}
 }
 
 internal sealed class TestApp(LifetimeTestRunner runner) : Application
@@ -45,7 +86,15 @@ internal sealed class TestApp(LifetimeTestRunner runner) : Application
 		// What a real app sees as a crash (or its global error handling).
 		Dispatcher.UIThread.UnhandledException += (_, e) =>
 		{
-			runner.ReportFatal("Dispatcher.UnhandledException", e.Exception);
+			if (ReferenceEquals(e.Exception, Scenarios.ExpectedUnhandled))
+			{
+				Scenarios.ExpectedUnhandledReported.TrySetResult();
+			}
+			else
+			{
+				runner.ReportFatal("Dispatcher.UnhandledException", e.Exception);
+			}
+
 			e.Handled = true;
 		};
 
@@ -56,8 +105,13 @@ internal sealed class TestApp(LifetimeTestRunner runner) : Application
 
 		Dispatcher.UIThread.Post(async () =>
 		{
-			var exitCode = await runner.RunAsync(new Scenarios(runner, provider).All());
-			await provider.DisposeAsync();
+			var scenarios = new Scenarios(runner, provider);
+			var exitCode = await runner.RunAsync(scenarios.All());
+
+			// Shut down with a view still open while a worker keeps dispatching through it (verified in Main).
+			var view = await scenarios.OpenViewForShutdownAsync();
+			ShutdownFlood.Start(view.Dispatcher);
+			await Task.Delay(200);
 			desktop.Shutdown(exitCode);
 		});
 
@@ -82,6 +136,39 @@ internal sealed class Scenarios(LifetimeTestRunner runner, IServiceProvider serv
 		yield return ("Resize follows Avalonia layout", () => Resize(constrained: false));
 		yield return ("Resize follows Avalonia layout, window smaller than its preferred size", () => Resize(constrained: true));
 		yield return ("Dispatching through Avalonia's dispatcher", DispatchThroughAvalonia);
+		yield return ("Dispatched work runs during a modal move loop", DispatchDuringModalLoop);
+		yield return ("Exceptions from work posted through the adapter reach Avalonia's handler", PostedExceptionReachesAvalonia);
+	}
+
+	/// <summary>Reported to <see cref="Dispatcher.UnhandledException"/> by the scenario that expects it.</summary>
+	public static Exception? ExpectedUnhandled { get; private set; }
+
+	public static TaskCompletionSource ExpectedUnhandledReported { get; private set; } = new();
+
+	// What BlazorWebView does with an exception its UnhandledException handlers leave unhandled.
+	private async Task PostedExceptionReachesAvalonia()
+	{
+		var expected = new InvalidOperationException("Expected unhandled exception");
+		ExpectedUnhandledReported = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+		ExpectedUnhandled = expected;
+		try
+		{
+			await Task.Run(() => new AvaloniaUiDispatcher(Dispatcher.UIThread).Post(() => throw expected));
+			await ExpectedUnhandledReported.Task.WaitAsync(TimeSpan.FromSeconds(5));
+		}
+		finally
+		{
+			ExpectedUnhandled = null;
+		}
+	}
+
+	public async Task<BlazorWebView> OpenViewForShutdownAsync()
+	{
+		Probe.Reset();
+		var host = CreateHost(view => view.RootComponents.Add<Probe>("#app"));
+		new Window { Title = "Avalonia.LifetimeTests (shutdown)", Width = 640, Height = 360, Content = host }.Show();
+		await LifetimeTestRunner.WaitUntil(() => Probe.Rendered, TimeSpan.FromSeconds(30), "the root component to render");
+		return host.View;
 	}
 
 	// The supported path: BlazorWindow cancels the first close, awaits the view's disposal, then closes.
@@ -223,6 +310,54 @@ internal sealed class Scenarios(LifetimeTestRunner runner, IServiceProvider serv
 		}
 	}
 
+	// Moving or resizing a window runs a modal message loop inside DefWindowProc, which Avalonia's dispatcher doesn't
+	// control. Work dispatched from another thread must still run while it's active.
+	private async Task DispatchDuringModalLoop()
+	{
+		var window = CreateProbeWindow();
+		window.Show();
+		try
+		{
+			await window.BlazorHost.Ready.WaitAsync(TimeSpan.FromSeconds(30));
+			var hwnd = window.TryGetPlatformHandle()!.Handle;
+			var dispatcher = window.BlazorHost.View.Dispatcher;
+			var inModalLoop = false;
+			var ranInModalLoop = false;
+			var worker = Task.Run(async () =>
+			{
+				try
+				{
+					await Task.Delay(300);
+					await dispatcher.InvokeAsync(() => { ranInModalLoop = Volatile.Read(ref inModalLoop); }).WaitAsync(TimeSpan.FromSeconds(5));
+				}
+				finally
+				{
+					// End the keyboard move loop.
+					Native.PostMessage(hwnd, Native.WM_KEYDOWN, Native.VK_ESCAPE, 0);
+					await Task.Delay(2000);
+					if (Volatile.Read(ref inModalLoop))
+					{
+						Native.PostMessage(hwnd, Native.WM_CANCELMODE, 0, 0);
+					}
+				}
+			});
+
+			var inLoop = System.Diagnostics.Stopwatch.StartNew();
+			Volatile.Write(ref inModalLoop, true);
+			Native.SendMessage(hwnd, Native.WM_SYSCOMMAND, Native.SC_MOVE, 0);
+			Volatile.Write(ref inModalLoop, false);
+			inLoop.Stop();
+			await worker;
+			Require(inLoop.ElapsedMilliseconds >= 250, $"The window didn't enter its modal move loop ({inLoop.ElapsedMilliseconds} ms).");
+			Require(ranInModalLoop, "Work dispatched from another thread didn't run during the modal move loop.");
+		}
+		finally
+		{
+			window.Close();
+			await window.ClosedTask.WaitAsync(TimeSpan.FromSeconds(15));
+		}
+	}
+
 	private BlazorWindow CreateWindow(bool throwException) => CreateWindow(AppComponent(throwException));
 
 	private BlazorWindow CreateProbeWindow() => CreateWindow(view => view.RootComponents.Add<Probe>("#app"));
@@ -268,4 +403,20 @@ internal sealed class Scenarios(LifetimeTestRunner runner, IServiceProvider serv
 			throw new InvalidOperationException(message);
 		}
 	}
+}
+
+internal static partial class Native
+{
+	public const uint WM_KEYDOWN = 0x0100;
+	public const uint WM_SYSCOMMAND = 0x0112;
+	public const uint WM_CANCELMODE = 0x001F;
+	public const nint SC_MOVE = 0xF010;
+	public const nint VK_ESCAPE = 0x1B;
+
+	[LibraryImport("user32.dll", EntryPoint = "SendMessageW")]
+	public static partial nint SendMessage(nint hwnd, uint message, nint wParam, nint lParam);
+
+	[LibraryImport("user32.dll", EntryPoint = "PostMessageW")]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	public static partial bool PostMessage(nint hwnd, uint message, nint wParam, nint lParam);
 }

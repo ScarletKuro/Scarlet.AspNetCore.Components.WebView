@@ -89,26 +89,31 @@ Work for the UI thread goes through that thread's `DirectNMessageQueue` from
 DirectN application Blazor shares one queue, ordering and `SynchronizationContext` with the rest of the UI thread. If the
 thread has no `SynchronizationContext` yet, the view installs the queue's.
 
-When a UI framework should own scheduling as well as the message loop, use
-`new BlazorWebView(parentHwnd, threading)` with an implementation of `IBlazorWebViewThreading`.
-The interface supplies the Blazor `Dispatcher`, a UI `SynchronizationContext`, `CheckAccess` and an
-`UnhandledException` event. It uses Blazor's existing dispatcher abstraction rather than repeating its
-`InvokeAsync` methods. The default `DirectNBlazorWebViewThreading` implementation combines the shared
-DirectN queue with a view-specific `Win32Dispatcher`.
+### Using a UI framework's dispatcher
 
-Create one threading integration per view on the parent's STA UI thread. The view installs the supplied
-context only if the thread has none and forwards integration errors through `BlazorWebView.UnhandledException`.
-Set `Handled` there to handle a failure; otherwise the integration applies its host's exception policy.
-The default implementation rethrows unhandled failures; an Avalonia implementation can route them through
-Avalonia's dispatcher exception handling.
+When a UI framework owns the thread, such as Avalonia, pass its dispatcher instead, so Blazor's work shares its ordering,
+priorities and unhandled-exception handling: `new BlazorWebView(parentHwnd, dispatcher)`. The dispatcher is a
+`DirectNDispatcher` whose one method queues a callback on the UI thread:
 
-The view owns the integration after successful construction and disposes it after WebView cleanup.
-Disposing the integration must detach that view's callbacks while leaving shared dispatchers, queues
-and synchronization contexts usable for other views and pending continuations. Do not share the same
-integration instance between views. Keep the host's message loop alive until `DisposeAsync` completes.
-See [the Windows Avalonia example](../examples/Avalonia.BlazorApp) for a `NativeControlHost` wrapper,
-threading integration, shared services and asynchronous shutdown. Its threading implementation creates
-no DirectN message queue.
+```csharp
+sealed class FrameworkDispatcher : DirectNDispatcher
+{
+    public override bool CheckAccess() => /* is this the UI thread? */;
+
+    protected override bool TryEnqueue(SendOrPostCallback callback, object? state, Action<object?> onAbandoned)
+    {
+        // Queue callback(state) on the UI thread; return false if the framework no longer accepts work,
+        // and call onAbandoned(state) if it drops accepted work without running it (e.g. at shutdown).
+    }
+}
+```
+
+Its contract, documented on `TryEnqueue`: always queue (never run inline), keep the caller's `ExecutionContext`, run under
+the UI thread's `SynchronizationContext`, run each accepted callback once or report it abandoned, and route the callback's
+exceptions to the framework's unhandled-exception handling. The view keeps Blazor's dispatching rules on top of it: work
+dispatched on the UI thread runs inline, work the dispatcher drops faults its task instead of never completing, and
+exceptions left unhandled by `UnhandledException` are rethrown through the dispatcher. See
+[the Avalonia example](../examples/Avalonia.BlazorApp/AvaloniaUiDispatcher.cs) for an implementation.
 
 ## API
 
@@ -118,7 +123,8 @@ folder, environment options, or a pre-created environment), `BlazorWebViewInitia
 `AddBlazorWebViewDeveloperTools`. On top of that:
 
 - `UnhandledException`: reports exceptions from work dispatched to the UI thread. Set `Handled` to keep the process
-  alive; otherwise the threading integration applies its host's unhandled-exception policy.
+  alive; otherwise the exception is rethrown as a normal unhandled exception (through the UI framework's dispatcher,
+  when the view was created with one).
 - `Bounds`, `IsVisible`, `MoveFocus`, `NotifyParentWindowPositionChanged`: control the WebView2 controller.
 - `WebView` / `Controller`: the underlying WebView2Aot `ICoreWebView2` / `ICoreWebView2Controller` objects.
 

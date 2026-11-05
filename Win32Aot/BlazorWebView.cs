@@ -5,6 +5,7 @@ using System;
 using System.Collections.Specialized;
 using System.IO;
 using System.Linq;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using HWND = DirectN.HWND;
@@ -14,6 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
+using Scarlet.DirectN.Threading;
 using WebView2;
 using WebView2.Utilities;
 
@@ -38,8 +40,10 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 	public class BlazorWebView : IAsyncDisposable
 	{
 		private readonly nint _parentWindow;
-		private readonly IBlazorWebViewThreading _threading;
-		private readonly Dispatcher _dispatcher;
+		private readonly DirectNDispatcher _uiDispatcher;
+		// The thread's DirectN queue when the view schedules through it; null with a host framework's dispatcher.
+		private readonly DirectNMessageQueue? _queue;
+		private readonly Win32Dispatcher _dispatcher;
 		private Win32AotWebViewManager? _webviewManager;
 		private ILogger _logger = NullLogger<BlazorWebView>.Instance;
 		private string? _hostPage;
@@ -55,55 +59,33 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 		/// Must be called on the parent window's UI thread.
 		/// </summary>
 		/// <param name="parentWindow">The handle (HWND) of the window that will host the WebView2.</param>
+		/// <remarks>Work for the UI thread goes through the thread's <see cref="DirectNMessageQueue"/>.</remarks>
 		public BlazorWebView(nint parentWindow)
-			: this(parentWindow, CreateDefaultThreading(parentWindow))
+			: this(dispatcher: null, parentWindow)
 		{
 		}
 
 		/// <summary>
-		/// Creates a view using the supplied host threading integration.
-		/// Must be called on the parent window's STA UI thread.
+		/// Creates a new instance of <see cref="BlazorWebView"/> hosted in <paramref name="parentWindow"/>, whose work for the
+		/// UI thread goes through <paramref name="dispatcher"/>, such as a UI framework's own dispatcher.
+		/// Must be called on the parent window's UI thread.
 		/// </summary>
 		/// <param name="parentWindow">The handle (HWND) of the window that will host the WebView2.</param>
-		/// <param name="threading">The threading integration for this view.</param>
-		/// <exception cref="ArgumentNullException"><paramref name="threading"/> is null.</exception>
+		/// <param name="dispatcher">Schedules work on the parent window's UI thread.</param>
 		/// <remarks>
-		/// The integration must target the current thread. The view takes ownership after successful construction and
-		/// disposes it after asynchronous WebView cleanup, without stopping the host's shared UI infrastructure.
-		/// Its exceptions are forwarded to <see cref="UnhandledException"/>; errors left unhandled follow the integration's
-		/// host-specific exception policy. Keep the host's message loop running until <see cref="DisposeAsync"/> completes.
+		/// The view keeps Blazor's dispatching rules on top of <paramref name="dispatcher"/>: work dispatched on the UI
+		/// thread runs inline, and work the dispatcher drops (for example at shutdown) faults its task instead of never
+		/// completing. Exceptions left unhandled by <see cref="UnhandledException"/> are rethrown through
+		/// <paramref name="dispatcher"/>, so they follow the host framework's unhandled-exception handling.
 		/// </remarks>
-		public BlazorWebView(nint parentWindow, IBlazorWebViewThreading threading)
+		/// <exception cref="ArgumentNullException"><paramref name="dispatcher"/> is <see langword="null"/>.</exception>
+		/// <exception cref="ArgumentException"><paramref name="dispatcher"/> doesn't belong to the calling thread.</exception>
+		public BlazorWebView(nint parentWindow, DirectNDispatcher dispatcher)
+			: this(dispatcher ?? throw new ArgumentNullException(nameof(dispatcher)), parentWindow)
 		{
-			ArgumentNullException.ThrowIfNull(threading);
-			ValidateParentWindowAndThread(parentWindow);
-
-			_parentWindow = parentWindow;
-			_threading = threading;
-			if (!_threading.CheckAccess())
-			{
-				throw new ArgumentException("The threading integration must target the thread creating the view.", nameof(threading));
-			}
-			_dispatcher = _threading.Dispatcher;
-
-			// WebView2 objects are thread-affine. Keep an existing host framework context.
-			if (SynchronizationContext.Current is null)
-			{
-				SynchronizationContext.SetSynchronizationContext(_threading.SynchronizationContext);
-			}
-
-			_threading.UnhandledException += HandleThreadingUnhandledException;
-			RootComponents.CollectionChanged += HandleRootComponentsCollectionChanged;
 		}
 
-		private static DirectNBlazorWebViewThreading CreateDefaultThreading(nint parentWindow)
-		{
-			// Validate before allocating an adapter that subscribes to the shared UI queue.
-			ValidateParentWindowAndThread(parentWindow);
-			return new DirectNBlazorWebViewThreading();
-		}
-
-		private static void ValidateParentWindowAndThread(nint parentWindow)
+		private BlazorWebView(DirectNDispatcher? dispatcher, nint parentWindow)
 		{
 			if (parentWindow == 0)
 			{
@@ -114,6 +96,32 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 			{
 				throw new InvalidOperationException("BlazorWebView must be created on an STA thread. Mark the entry point with [STAThread].");
 			}
+
+			dispatcher ??= DirectNMessageQueue.GetOrCreateForCurrentThread();
+			if (!dispatcher.CheckAccess())
+			{
+				throw new ArgumentException("The dispatcher must belong to the thread creating the view.", nameof(dispatcher));
+			}
+
+			_parentWindow = parentWindow;
+			_uiDispatcher = dispatcher;
+			_queue = dispatcher as DirectNMessageQueue;
+			if (_queue is not null)
+			{
+				_queue.UnhandledException += HandleQueueUnhandledException;
+			}
+
+			_dispatcher = new Win32Dispatcher(dispatcher, HandleUnhandledException);
+
+			// await continuations must come back to the UI thread because WebView2 objects are thread-affine.
+			// Host frameworks such as WinForms, WPF or Avalonia already provide a suitable context; keep theirs.
+			if (SynchronizationContext.Current is null)
+			{
+				SynchronizationContext.SetSynchronizationContext(
+					_queue is not null ? _queue.SynchronizationContext : new DispatcherSynchronizationContext(dispatcher));
+			}
+
+			RootComponents.CollectionChanged += HandleRootComponentsCollectionChanged;
 		}
 
 		/// <summary>
@@ -249,7 +257,8 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 		/// <summary>
 		/// Raised on the UI thread when work dispatched by Blazor throws. Set
 		/// <see cref="BlazorWebViewUnhandledExceptionEventArgs.Handled"/> to keep the process alive; otherwise
-		/// the threading integration applies its host's unhandled-exception policy.
+		/// the exception is rethrown as an unhandled exception (through the UI framework's dispatcher, when the view was
+		/// created with one).
 		/// </summary>
 		public event EventHandler<BlazorWebViewUnhandledExceptionEventArgs>? UnhandledException;
 
@@ -497,26 +506,70 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 			}
 			finally
 			{
-				_threading.UnhandledException -= HandleThreadingUnhandledException;
-				_threading.Dispose();
+				// The UI thread's queue and synchronization context deliberately stay alive: continuations of code
+				// awaiting this disposal (and other views on the thread) still need them.
+				if (_queue is not null)
+				{
+					_queue.UnhandledException -= HandleQueueUnhandledException;
+				}
 			}
 		}
 
-		private void HandleThreadingUnhandledException(object? sender, BlazorWebViewUnhandledExceptionEventArgs args)
+		// Exceptions from Blazor dispatcher work items.
+		private void HandleUnhandledException(Exception exception)
 		{
 			if (IsDisposed)
 			{
-				// The dispatcher's returned task still faults for any awaiting caller.
-				args.Handled = true;
-				_logger.LogDebug(args.Exception, "Ignoring an exception from work dispatched after the BlazorWebView was disposed.");
+				// Mirrors WinForms: once the view is gone there is nothing to promote the exception to.
+				// The exception still faults the Task returned to whoever awaited the work.
+				_logger.LogDebug(exception, "Ignoring an exception from work dispatched after the BlazorWebView was disposed.");
+				return;
+			}
+
+			var args = new BlazorWebViewUnhandledExceptionEventArgs(exception);
+			try
+			{
+				RaiseUnhandledException(args);
+			}
+			catch (Exception handlerException)
+			{
+				RethrowAsUnhandled(new AggregateException(exception, handlerException));
 				return;
 			}
 
 			if (!args.Handled)
 			{
-				_logger.LogError(args.Exception, "Unhandled exception in work dispatched by BlazorWebView.");
-				UnhandledException?.Invoke(this, args);
+				RethrowAsUnhandled(exception);
 			}
+		}
+
+		private void RethrowAsUnhandled(Exception exception)
+		{
+			// Rethrown through a host framework's dispatcher, so it reaches that framework's unhandled-exception handling.
+			// The DirectN queue's own path would report it to this view again (HandleQueueUnhandledException).
+			if (_queue is null && _uiDispatcher.TryPost(ExceptionDispatchInfo.Capture(exception).Throw))
+			{
+				return;
+			}
+
+			DirectNMessageQueue.RethrowAsUnhandled(exception);
+		}
+
+		// Exceptions from other code posted to the UI thread's synchronization context (e.g. async void continuations).
+		private void HandleQueueUnhandledException(object? sender, DirectNUnhandledExceptionEventArgs e)
+		{
+			if (!e.Handled)
+			{
+				var args = new BlazorWebViewUnhandledExceptionEventArgs(e.Exception);
+				RaiseUnhandledException(args);
+				e.Handled = args.Handled;
+			}
+		}
+
+		private void RaiseUnhandledException(BlazorWebViewUnhandledExceptionEventArgs args)
+		{
+			_logger.LogError(args.Exception, "Unhandled exception in work dispatched by BlazorWebView.");
+			UnhandledException?.Invoke(this, args);
 		}
 
 		private void ThrowIfStarted()
@@ -529,7 +582,7 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 
 		private void ThrowIfNotOnUIThread()
 		{
-			if (!_threading.CheckAccess())
+			if (!_uiDispatcher.CheckAccess())
 			{
 				throw new InvalidOperationException("BlazorWebView must be used on the thread that created it.");
 			}
