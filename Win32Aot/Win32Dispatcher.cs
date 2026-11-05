@@ -5,27 +5,29 @@ using Scarlet.DirectN.Threading;
 namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 {
 	/// <summary>
-	/// <see cref="Dispatcher"/> implementation that invokes work on the UI thread through a <see cref="DirectNMessageQueue"/>.
+	/// <see cref="Dispatcher"/> implementation that invokes work on the UI thread through a <see cref="DirectNDispatcher"/>.
 	/// </summary>
 	internal sealed class Win32Dispatcher : Dispatcher
 	{
-		private readonly DirectNMessageQueue _queue;
+		private readonly DirectNDispatcher _dispatcher;
 		private readonly Action<Exception> _onUnhandledException;
 
 		/// <summary>
 		/// Creates a new instance of <see cref="Win32Dispatcher"/>.
 		/// </summary>
-		/// <param name="queue">The queue bound to the UI thread.</param>
+		/// <param name="dispatcher">The dispatcher bound to the UI thread.</param>
 		/// <param name="onUnhandledException">Invoked on the UI thread with exceptions thrown by dispatched work. The
 		/// owner ignores them once it has been disposed (mirroring WinForms, where a disposed control can't rethrow).</param>
-		public Win32Dispatcher(DirectNMessageQueue queue, Action<Exception> onUnhandledException)
+		public Win32Dispatcher(DirectNDispatcher dispatcher, Action<Exception> onUnhandledException)
 		{
-			_queue = queue ?? throw new ArgumentNullException(nameof(queue));
+			_dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
 			_onUnhandledException = onUnhandledException ?? throw new ArgumentNullException(nameof(onUnhandledException));
 		}
 
-		public override bool CheckAccess() => _queue.CheckAccess();
+		public override bool CheckAccess() => _dispatcher.CheckAccess();
 
+		// On the UI thread, work runs inline, as Blazor expects. From other threads, DirectNDispatcher.InvokeAsync faults
+		// the task with InvalidOperationException when the UI thread closes its queue or exits before the work runs.
 		public override async Task InvokeAsync(Action workItem)
 		{
 			ArgumentNullException.ThrowIfNull(workItem);
@@ -37,21 +39,7 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 				}
 				else
 				{
-					var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-					_queue.Post(static state =>
-					{
-						var (workItem, tcs) = ((Action, TaskCompletionSource))state!;
-						try
-						{
-							workItem();
-							tcs.TrySetResult();
-						}
-						catch (Exception ex)
-						{
-							tcs.TrySetException(ex);
-						}
-					}, (workItem, tcs));
-					await tcs.Task;
+					await _dispatcher.InvokeAsync(workItem);
 				}
 			}
 			catch (Exception ex)
@@ -74,21 +62,7 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 				}
 				else
 				{
-					var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-					_queue.Post(static async state =>
-					{
-						var (workItem, tcs) = ((Func<Task>, TaskCompletionSource))state!;
-						try
-						{
-							await workItem();
-							tcs.TrySetResult();
-						}
-						catch (Exception ex)
-						{
-							tcs.TrySetException(ex);
-						}
-					}, (workItem, tcs));
-					await tcs.Task;
+					await _dispatcher.InvokeAsync(workItem);
 				}
 			}
 			catch (Exception ex)
@@ -103,27 +77,7 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 			ArgumentNullException.ThrowIfNull(workItem);
 			try
 			{
-				if (CheckAccess())
-				{
-					return workItem();
-				}
-				else
-				{
-					var tcs = new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-					_queue.Post(static state =>
-					{
-						var (workItem, tcs) = ((Func<TResult>, TaskCompletionSource<TResult>))state!;
-						try
-						{
-							tcs.TrySetResult(workItem());
-						}
-						catch (Exception ex)
-						{
-							tcs.TrySetException(ex);
-						}
-					}, (workItem, tcs));
-					return await tcs.Task;
-				}
+				return CheckAccess() ? workItem() : await _dispatcher.InvokeAsync(workItem);
 			}
 			catch (Exception ex)
 			{
@@ -137,27 +91,7 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 			ArgumentNullException.ThrowIfNull(workItem);
 			try
 			{
-				if (CheckAccess())
-				{
-					return await workItem();
-				}
-				else
-				{
-					var tcs = new TaskCompletionSource<TResult>(TaskCreationOptions.RunContinuationsAsynchronously);
-					_queue.Post(static async state =>
-					{
-						var (workItem, tcs) = ((Func<Task<TResult>>, TaskCompletionSource<TResult>))state!;
-						try
-						{
-							tcs.TrySetResult(await workItem());
-						}
-						catch (Exception ex)
-						{
-							tcs.TrySetException(ex);
-						}
-					}, (workItem, tcs));
-					return await tcs.Task;
-				}
+				return CheckAccess() ? await workItem() : await _dispatcher.InvokeAsync(workItem);
 			}
 			catch (Exception ex)
 			{
@@ -192,12 +126,8 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 				return;
 			}
 
-			// Dropped when the UI thread's queue is closed: there is no one left to report to.
-			_queue.TryPost(static state =>
-			{
-				var (self, exception) = ((Win32Dispatcher, Exception))state!;
-				self._onUnhandledException(exception);
-			}, (this, ex));
+			// Dropped when the UI thread's queue is closed (also the reason work never ran): there is no one left to report to.
+			_dispatcher.TryPost(() => _onUnhandledException(ex));
 		}
 
 		private static bool IsRendererDisposedRace(Exception ex) =>

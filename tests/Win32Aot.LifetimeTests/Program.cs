@@ -70,6 +70,8 @@ internal static class Program
 			("Parent destroyed, view never disposed, exception thrown", (sp, ms) => NeverDisposed(sp, ms, throwException: true)),
 			("Parent destroyed, view never disposed, no exception", (sp, ms) => NeverDisposed(sp, ms, throwException: false)),
 			("Rapid open/close x10, exception thrown", (sp, ms) => RapidOpenClose(sp, ms, count: 10)),
+			("InvokeAsync to a UI thread that exits before running it", (sp, _) => InvokeOnDroppedThread(sp, closeQueue: false)),
+			("InvokeAsync to a UI thread that closes its queue before running it", (sp, _) => InvokeOnDroppedThread(sp, closeQueue: true)),
 		};
 
 		var results = new List<(string Name, string Outcome, string Detail)>();
@@ -184,6 +186,63 @@ internal static class Program
 
 		Pump.Until(() => windows.TrueForAll(w => w.IsDisposed), TimeSpan.FromSeconds(30), "windows to close");
 		WaitForBackgroundWork(finished: count, delay);
+	}
+
+	// Work dispatched from another thread that its UI thread drops without running must fault the caller's task, not
+	// leave it pending forever.
+	private static void InvokeOnDroppedThread(IServiceProvider services, bool closeQueue)
+	{
+		Microsoft.AspNetCore.Components.Dispatcher? dispatcher = null;
+		using var created = new ManualResetEventSlim();
+		using var dispatched = new ManualResetEventSlim();
+		var ran = 0;
+		var uiThread = new Thread(() =>
+		{
+			using var parent = new Window("Win32Aot.LifetimeTests (dropped thread)", WINDOW_STYLE.WS_OVERLAPPEDWINDOW);
+			var view = new BlazorWebView(parent.Handle.Value) { Services = services };
+			view.UnhandledException += (_, e) =>
+			{
+				s_fatal.Enqueue($"BlazorWebView.UnhandledException: {e.Exception.GetType().Name}: {e.Exception.Message}");
+				e.Handled = true;
+			};
+			dispatcher = view.Dispatcher;
+			created.Set();
+			dispatched.Wait();
+			if (closeQueue)
+			{
+				Scarlet.DirectN.Threading.DirectNMessageQueue.Current!.Close();
+			}
+		});
+		uiThread.SetApartmentState(ApartmentState.STA);
+		uiThread.Start();
+		if (!created.Wait(TimeSpan.FromSeconds(30)))
+		{
+			throw new TimeoutException("Timed out waiting for the UI thread to create its view.");
+		}
+
+		var tasks = new Task[]
+		{
+			dispatcher!.InvokeAsync(() => { Interlocked.Increment(ref ran); }),
+			dispatcher.InvokeAsync(() => Interlocked.Increment(ref ran)),
+			dispatcher.InvokeAsync(() => { Interlocked.Increment(ref ran); return Task.CompletedTask; }),
+			dispatcher.InvokeAsync(() => Task.FromResult(Interlocked.Increment(ref ran))),
+		};
+		dispatched.Set();
+		uiThread.Join();
+
+		Pump.Until(() => Array.TrueForAll(tasks, t => t.IsCompleted), TimeSpan.FromSeconds(15), "dropped invocations to complete");
+		foreach (var task in tasks)
+		{
+			if (task.Exception?.GetBaseException() is not InvalidOperationException)
+			{
+				throw new InvalidOperationException($"Expected a dropped invocation to fault with InvalidOperationException, got {task.Status}: {task.Exception?.GetBaseException()}");
+			}
+		}
+
+		if (ran != 0)
+		{
+			throw new InvalidOperationException($"{ran} dropped invocation(s) ran.");
+		}
 	}
 
 	private static BlazorWebViewWindow OpenWindow(IServiceProvider services, int delay, bool throwException)
