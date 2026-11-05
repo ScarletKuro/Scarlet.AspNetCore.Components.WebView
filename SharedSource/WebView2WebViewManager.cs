@@ -159,14 +159,14 @@ namespace Microsoft.AspNetCore.Components.WebView.WebView2
 				return;
 			}
 
-            // CoreWebView2 is null until WebView2 initialization completes
-            var coreWebView = _webview.CoreWebView2;
-            if (coreWebView is null)
-            {
-                return;
-            }
-            
-            try
+			// CoreWebView2 is null until WebView2 initialization completes
+			var coreWebView = _webview.CoreWebView2;
+			if (coreWebView is null)
+			{
+				return;
+			}
+			
+			try
 			{
 				_webview.CoreWebView2.PostWebMessageAsString(message);
 			}
