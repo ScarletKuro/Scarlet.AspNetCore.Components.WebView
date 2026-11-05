@@ -183,7 +183,8 @@ namespace Microsoft.AspNetCore.Components.WebView.WindowsForms
 			{
 				appRootDir = AppContext.BaseDirectory;
 			}
-			var hostPageFullPath = Path.GetFullPath(Path.Combine(appRootDir, HostPage!)); // HostPage is nonnull because RequiredStartupPropertiesSet is checked above
+			string hostPageFullPath;
+			(appRootDir, hostPageFullPath) = HostPageLocator.Resolve(HostPage!, appRootDir); // HostPage is nonnull because RequiredStartupPropertiesSet is checked above
 			var contentRootDirFullPath = Path.GetDirectoryName(hostPageFullPath)!;
 			var contentRootRelativePath = Path.GetRelativePath(appRootDir, contentRootDirFullPath);
 			var hostPageRelativePath = Path.GetRelativePath(contentRootDirFullPath, hostPageFullPath);

@@ -251,9 +251,9 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 
 			// We assume the host page is always in the root of the content directory, because it's
 			// unclear there's any other use case. We can add more options later if so.
-			// AppContext.BaseDirectory is the application directory for both JIT and NativeAOT/single-file apps.
-			var appRootDir = AppContext.BaseDirectory;
-			var hostPageFullPath = Path.GetFullPath(Path.Combine(appRootDir, HostPage));
+			// AppContext.BaseDirectory is the application directory for JIT and NativeAOT apps; HostPageLocator also covers a
+			// single-file app that extracts its content elsewhere.
+			var (appRootDir, hostPageFullPath) = HostPageLocator.Resolve(HostPage, AppContext.BaseDirectory);
 			var contentRootDirFullPath = Path.GetDirectoryName(hostPageFullPath)!;
 			var contentRootRelativePath = Path.GetRelativePath(appRootDir, contentRootDirFullPath);
 			var hostPageRelativePath = Path.GetRelativePath(contentRootDirFullPath, hostPageFullPath);

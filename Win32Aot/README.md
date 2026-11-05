@@ -183,6 +183,20 @@ What remains your responsibility, as in any AOT app:
 - **Expected publish warnings.** Blazor's own `IL2xxx`/`IL3xxx` warnings show up at publish time. Watch for new
   warnings from your code.
 
+## Single-file publishing
+
+`PublishSingleFile` works with or without NativeAOT. Two things a single-file app that extracts its content
+(`IncludeAllContentForSelfExtract` or `IncludeNativeLibrariesForSelfExtract`) would otherwise trip over are handled:
+
+- **`WebView2Loader.dll` is found** although it's bundled into the exe and extracted to a temporary folder at startup.
+  WebView2Aot only looks next to the executable; the host first loads it through the .NET runtime's native library
+  search, which knows the extraction folder.
+- **A relative `HostPage` is found** (e.g. `wwwroot\index.html`). The app then reports the extraction folder as its
+  directory (`AppContext.BaseDirectory`), while the published `wwwroot` usually stays next to the executable; without
+  this the page shows "There is no content at ...", as with Microsoft's WinForms/WPF controls. Both folders are tried, so
+  `wwwroot` can be extracted with the app or sit next to the exe, and an absolute `HostPage` path isn't needed (absolute
+  paths still work).
+
 ## Troubleshooting
 
 - **`'vswhere.exe' is not recognized` / `link.exe ... exited with code 3` during AOT publish.** Some Visual Studio

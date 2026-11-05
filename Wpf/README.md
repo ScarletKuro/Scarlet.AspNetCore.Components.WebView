@@ -31,6 +31,11 @@ is a fork of that code, released independently, with these changes:
 - **Shared WebView2 environment.** Several `BlazorWebView`s can reuse one `CoreWebView2Environment` instead of each
   creating its own, which saves that work for every view after the first
   (see [Sharing a WebView2 environment](#sharing-a-webview2-environment)).
+- **Single-file publishing.** A relative `HostPage` such as `wwwroot\index.html` is resolved against the application
+  directory. A single-file app that extracts its content (`IncludeAllContentForSelfExtract`) reports its temporary
+  extraction folder as that directory, while the published `wwwroot` stays next to the executable, so Microsoft's control
+  shows "There is no content at ...". This package looks in both folders, so the usual workaround of passing an absolute
+  `HostPage` path isn't needed (absolute paths still work).
 
 The lifetime scenarios from dotnet/maui#34855 run in CI against real windows. With the same tests, Microsoft's package
 fails the scenarios that call `DisposeAsync`.
