@@ -41,11 +41,11 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 		private void ReportDispatcherException(Exception exception)
 		{
 			if (_disposed)
-            {
-                return;
-            }
+			{
+				return;
+			}
 
-            var args = new BlazorWebViewUnhandledExceptionEventArgs(exception);
+			var args = new BlazorWebViewUnhandledExceptionEventArgs(exception);
 			try
 			{
 				UnhandledException?.Invoke(this, args);
@@ -57,10 +57,10 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 			}
 
 			if (!args.Handled)
-            {
-                DirectNMessageQueue.RethrowAsUnhandled(exception);
-            }
-        }
+			{
+				DirectNMessageQueue.RethrowAsUnhandled(exception);
+			}
+		}
 
 		private void HandleQueueUnhandledException(object? sender, DirectNUnhandledExceptionEventArgs e)
 		{
@@ -79,16 +79,16 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 		public void Dispose()
 		{
 			if (!CheckAccess())
-            {
-                throw new InvalidOperationException("The threading integration must be disposed on its UI thread.");
-            }
+			{
+				throw new InvalidOperationException("The threading integration must be disposed on its UI thread.");
+			}
 
-            if (_disposed)
-            {
-                return;
-            }
+			if (_disposed)
+			{
+				return;
+			}
 
-            _disposed = true;
+			_disposed = true;
 			_queue.UnhandledException -= HandleQueueUnhandledException;
 			UnhandledException = null;
 		}
