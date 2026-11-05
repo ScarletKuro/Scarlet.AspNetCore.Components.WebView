@@ -23,7 +23,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebView" Version="10.0.*" />
     <PackageReference Include="WebView2Aot" Version="1.7.0" />
-    <PackageReference Include="Scarlet.DirectN.Threading" Version="1.0.0" />
+    <PackageReference Include="Scarlet.DirectN.Threading" Version="1.1.0" />
     <!-- Only used to redistribute the native WebView2Loader.dll; no managed assets flow to consumers. -->
     <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.*" GeneratePathProperty="true" ExcludeAssets="all" PrivateAssets="all" />
   </ItemGroup>
