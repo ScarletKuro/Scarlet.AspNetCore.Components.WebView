@@ -61,31 +61,31 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 		/// <param name="parentWindow">The handle (HWND) of the window that will host the WebView2.</param>
 		/// <remarks>Work for the UI thread goes through the thread's <see cref="DirectNMessageQueue"/>.</remarks>
 		public BlazorWebView(nint parentWindow)
-			: this(dispatcher: null, parentWindow)
+			: this(uiDispatcher: null, parentWindow)
 		{
 		}
 
 		/// <summary>
 		/// Creates a new instance of <see cref="BlazorWebView"/> hosted in <paramref name="parentWindow"/>, whose work for the
-		/// UI thread goes through <paramref name="dispatcher"/>, such as a UI framework's own dispatcher.
+		/// UI thread goes through <paramref name="uiDispatcher"/>, such as a UI framework's own dispatcher.
 		/// Must be called on the parent window's UI thread.
 		/// </summary>
 		/// <param name="parentWindow">The handle (HWND) of the window that will host the WebView2.</param>
-		/// <param name="dispatcher">Schedules work on the parent window's UI thread.</param>
+		/// <param name="uiDispatcher">Schedules work on the parent window's UI thread. <see cref="Dispatcher"/> is the view's Blazor dispatcher built on top of it.</param>
 		/// <remarks>
-		/// The view keeps Blazor's dispatching rules on top of <paramref name="dispatcher"/>: work dispatched on the UI
+		/// The view keeps Blazor's dispatching rules on top of <paramref name="uiDispatcher"/>: work dispatched on the UI
 		/// thread runs inline, and work the dispatcher drops (for example at shutdown) faults its task instead of never
 		/// completing. Exceptions left unhandled by <see cref="UnhandledException"/> are rethrown through
-		/// <paramref name="dispatcher"/>, so they follow the host framework's unhandled-exception handling.
+		/// <paramref name="uiDispatcher"/>, so they follow the host framework's unhandled-exception handling.
 		/// </remarks>
-		/// <exception cref="ArgumentNullException"><paramref name="dispatcher"/> is <see langword="null"/>.</exception>
-		/// <exception cref="ArgumentException"><paramref name="dispatcher"/> doesn't belong to the calling thread.</exception>
-		public BlazorWebView(nint parentWindow, DirectNDispatcher dispatcher)
-			: this(dispatcher ?? throw new ArgumentNullException(nameof(dispatcher)), parentWindow)
+		/// <exception cref="ArgumentNullException"><paramref name="uiDispatcher"/> is <see langword="null"/>.</exception>
+		/// <exception cref="ArgumentException"><paramref name="uiDispatcher"/> doesn't belong to the calling thread.</exception>
+		public BlazorWebView(nint parentWindow, DirectNDispatcher uiDispatcher)
+			: this(uiDispatcher ?? throw new ArgumentNullException(nameof(uiDispatcher)), parentWindow)
 		{
 		}
 
-		private BlazorWebView(DirectNDispatcher? dispatcher, nint parentWindow)
+		private BlazorWebView(DirectNDispatcher? uiDispatcher, nint parentWindow)
 		{
 			if (parentWindow == 0)
 			{
@@ -97,28 +97,28 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 				throw new InvalidOperationException("BlazorWebView must be created on an STA thread. Mark the entry point with [STAThread].");
 			}
 
-			dispatcher ??= DirectNMessageQueue.GetOrCreateForCurrentThread();
-			if (!dispatcher.CheckAccess())
+			uiDispatcher ??= DirectNMessageQueue.GetOrCreateForCurrentThread();
+			if (!uiDispatcher.CheckAccess())
 			{
-				throw new ArgumentException("The dispatcher must belong to the thread creating the view.", nameof(dispatcher));
+				throw new ArgumentException("The dispatcher must belong to the thread creating the view.", nameof(uiDispatcher));
 			}
 
 			_parentWindow = parentWindow;
-			_uiDispatcher = dispatcher;
-			_queue = dispatcher as DirectNMessageQueue;
+			_uiDispatcher = uiDispatcher;
+			_queue = uiDispatcher as DirectNMessageQueue;
 			if (_queue is not null)
 			{
 				_queue.UnhandledException += HandleQueueUnhandledException;
 			}
 
-			_dispatcher = new Win32Dispatcher(dispatcher, HandleUnhandledException);
+			_dispatcher = new Win32Dispatcher(uiDispatcher, HandleUnhandledException);
 
 			// await continuations must come back to the UI thread because WebView2 objects are thread-affine.
 			// Host frameworks such as WinForms, WPF or Avalonia already provide a suitable context; keep theirs.
 			if (SynchronizationContext.Current is null)
 			{
 				SynchronizationContext.SetSynchronizationContext(
-					_queue is not null ? _queue.SynchronizationContext : new DispatcherSynchronizationContext(dispatcher));
+					_queue is not null ? _queue.SynchronizationContext : new DispatcherSynchronizationContext(uiDispatcher));
 			}
 
 			RootComponents.CollectionChanged += HandleRootComponentsCollectionChanged;
