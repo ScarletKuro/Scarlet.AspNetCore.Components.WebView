@@ -31,6 +31,7 @@
   <ItemGroup>
     <Compile Include="..\SharedSource\AutoCloseOnReadCompleteStream.cs" Link="SharedSource\AutoCloseOnReadCompleteStream.cs" />
     <Compile Include="..\SharedSource\HostAddressHelper.cs" Link="SharedSource\HostAddressHelper.cs" />
+    <Compile Include="..\SharedSource\HostPageLocator.cs" Link="SharedSource\HostPageLocator.cs" />
     <Compile Include="..\SharedSource\Log.cs" Link="SharedSource\Log.cs" />
     <Compile Include="..\SharedSource\QueryStringHelper.cs" Link="SharedSource\QueryStringHelper.cs" />
     <Compile Include="..\SharedSource\StaticContentHotReloadManager.cs" Link="SharedSource\StaticContentHotReloadManager.cs" />
