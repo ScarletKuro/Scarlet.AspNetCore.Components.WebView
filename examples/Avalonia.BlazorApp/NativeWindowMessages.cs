@@ -12,7 +12,9 @@ internal sealed unsafe partial class NativeWindowMessages : IDisposable
 	internal const uint Size = 0x0005;
 	internal const uint SetFocus = 0x0007;
 	internal const uint WindowPositionChanged = 0x0047;
+	private const uint EraseBackground = 0x0014;
 	private const uint NonClientDestroy = 0x0082;
+	private const int ColorWindow = 5;
 	private const nuint SubclassId = 1;
 
 	private readonly Action<uint> _onMessage;
@@ -58,6 +60,18 @@ internal sealed unsafe partial class NativeWindowMessages : IDisposable
 	[UnmanagedCallersOnly(CallConvs = [typeof(CallConvStdcall)])]
 	private static nint WindowProc(nint hwnd, uint message, nuint wParam, nint lParam, nuint subclassId, nuint data)
 	{
+		if (message == EraseBackground)
+		{
+			// NativeControlHost's window class has no background brush: until WebView2 covers the child, it would show
+			// whatever was on screen (often black) instead of the background other hosts paint.
+			RECT rect;
+			if (GetClientRect(hwnd, &rect))
+			{
+				_ = FillRect((nint)wParam, &rect, GetSysColorBrush(ColorWindow));
+			}
+			return 1;
+		}
+
 		var self = (NativeWindowMessages)GCHandle.FromIntPtr((nint)data).Target!;
 		try
 		{
@@ -88,4 +102,14 @@ internal sealed unsafe partial class NativeWindowMessages : IDisposable
 
 	[LibraryImport("comctl32.dll")]
 	private static partial nint DefSubclassProc(nint hwnd, uint message, nuint wParam, nint lParam);
+
+	[LibraryImport("user32.dll")]
+	[return: MarshalAs(UnmanagedType.Bool)]
+	private static partial bool GetClientRect(nint hwnd, RECT* rect);
+
+	[LibraryImport("user32.dll")]
+	private static partial int FillRect(nint hdc, RECT* rect, nint brush);
+
+	[LibraryImport("user32.dll")]
+	private static partial nint GetSysColorBrush(int index);
 }
