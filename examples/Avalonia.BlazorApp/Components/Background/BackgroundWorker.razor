@@ -1,0 +1,61 @@
+@* Same background work as https://github.com/ScarletKuro/WpfIssueThreading (dotnet/maui#34855). *@
+@inject BackgroundWorkWindows Windows
+
+<main style="padding: 1.5rem">
+    @if (_loading)
+    {
+        <h2>Loading...</h2>
+        <p>Close this window now. The work keeps running and touches the closed window in 5 seconds.</p>
+    }
+    else
+    {
+        <h2>Done</h2>
+    }
+</main>
+
+@code {
+    private bool _loading;
+
+    [Parameter] public int WindowId { get; set; }
+
+    [Parameter] public bool ThrowException { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+
+        _ = RunBackgroundWork();
+    }
+
+    private async Task RunBackgroundWork()
+    {
+        _loading = true;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await Task.Delay(5000);
+
+            if (ThrowException)
+            {
+                throw new Exception("Exception");
+            }
+        }
+        catch (Exception exception)
+        {
+            await DispatchExceptionAsync(exception);
+        }
+        finally
+        {
+            _loading = false;
+            try
+            {
+                await InvokeAsync(StateHasChanged);
+            }
+            finally
+            {
+                Windows.Add($"#{WindowId}: background work finished");
+            }
+        }
+    }
+}

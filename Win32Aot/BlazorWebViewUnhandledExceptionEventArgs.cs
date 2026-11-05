@@ -20,7 +20,8 @@ namespace Microsoft.AspNetCore.Components.WebView.Win32Aot
 		/// <summary>
 		/// Gets or sets a value indicating whether the exception has been handled. When left <see langword="false"/>,
 		/// the exception is rethrown as an unhandled exception, which terminates the process
-		/// (matching the default behavior of WinForms and WPF).
+		/// (matching the default behavior of WinForms and WPF). A view created with a UI framework's dispatcher rethrows
+		/// it through that dispatcher, so the framework's unhandled-exception handling applies.
 		/// </summary>
 		public bool Handled { get; set; }
 	}

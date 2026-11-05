@@ -60,6 +60,16 @@ internal static class Program
 		using var serviceProvider = services.BuildServiceProvider();
 
 		using var app = new Application { ExitOnLastWindowRemoved = false };
+		try
+		{
+			ThreadingTests.Run();
+			Console.WriteLine("PASS  Host dispatcher (thread checks, context, exceptions, lifetime)");
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"FAIL  Host dispatcher: {ex}");
+			return 1;
+		}
 
 		var scenarios = new (string Name, Action<IServiceProvider, int> Run)[]
 		{

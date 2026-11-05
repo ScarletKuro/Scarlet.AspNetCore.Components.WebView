@@ -1,0 +1,27 @@
+@* A root component without background work, whose disposal is asynchronous. *@
+@implements IAsyncDisposable
+
+<h1>Probe</h1>
+
+@code {
+    private static int s_rendered;
+    private static int s_disposed;
+
+    public static bool Rendered => Volatile.Read(ref s_rendered) != 0;
+
+    public static bool Disposed => Volatile.Read(ref s_disposed) != 0;
+
+    public static void Reset()
+    {
+        Volatile.Write(ref s_rendered, 0);
+        Volatile.Write(ref s_disposed, 0);
+    }
+
+    protected override void OnAfterRender(bool firstRender) => Volatile.Write(ref s_rendered, 1);
+
+    public async ValueTask DisposeAsync()
+    {
+        await Task.Delay(200);
+        Volatile.Write(ref s_disposed, 1);
+    }
+}

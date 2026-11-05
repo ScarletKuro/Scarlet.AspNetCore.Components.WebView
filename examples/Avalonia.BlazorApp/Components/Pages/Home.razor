@@ -1,0 +1,37 @@
+@page "/"
+@using System.Runtime.InteropServices
+@implements IDisposable
+@inject HostEvents HostEvents
+
+<h1>Blazor in Avalonia</h1>
+
+<p>
+    This page is rendered by Blazor inside WebView2, hosted by Avalonia's <code>NativeControlHost</code>
+    through <a href="https://github.com/smourier/WebView2Aot" target="_blank">WebView2Aot</a>.
+    Avalonia owns the UI thread, synchronization context and message loop.
+</p>
+
+<p>
+    Use the sidebar to try the same counter, JS interop, links, errors and background-work examples
+    as the other hosts. Open <a href="avalonia">Blazor inside Avalonia</a> to show native Avalonia
+    controls alongside Razor components and test shared state and worker dispatch.
+</p>
+
+<table class="info">
+    <tbody>
+        <tr><th>Native AOT</th><td>@(System.Runtime.JitInfo.GetCompiledMethodCount() == 0 ? "Yes" : "No (JIT)")</td></tr>
+        <tr><th>Runtime</th><td>@RuntimeInformation.FrameworkDescription</td></tr>
+        <tr><th>Process architecture</th><td>@RuntimeInformation.ProcessArchitecture</td></tr>
+        <tr><th>OS</th><td>@RuntimeInformation.OSDescription</td></tr>
+        <tr><th>Synchronization context</th><td>@(SynchronizationContext.Current?.GetType().Name ?? "None")</td></tr>
+        <tr><th>Window activations</th><td>@HostEvents.ActivationCount <small>(pushed from Avalonia via TryDispatchAsync)</small></td></tr>
+    </tbody>
+</table>
+
+@code {
+    protected override void OnInitialized() => HostEvents.Activated += OnActivated;
+
+    private void OnActivated() => StateHasChanged();
+
+    public void Dispose() => HostEvents.Activated -= OnActivated;
+}

@@ -1,0 +1,70 @@
+@page "/interop"
+@implements IDisposable
+@inject IJSRuntime JS
+@inject NativeDialogs NativeDialogs
+
+<h1>JS interop</h1>
+
+<section>
+    <h2>.NET &rarr; JS</h2>
+    <p>
+        Custom types cross the boundary as JSON strings and are deserialized with a source-generated
+        <code>JsonSerializerContext</code>, which keeps them trim and AOT safe.
+    </p>
+    <button class="btn" @onclick="LoadBrowserInfoAsync">Read browser info</button>
+    @if (_browserInfo is not null)
+    {
+        <table class="info">
+            <tbody>
+                <tr><th>User agent</th><td>@_browserInfo.UserAgent</td></tr>
+                <tr><th>Language</th><td>@_browserInfo.Language</td></tr>
+                <tr><th>Screen</th><td>@_browserInfo.ScreenWidth &times; @_browserInfo.ScreenHeight @@ @_browserInfo.DevicePixelRatio&times;</td></tr>
+            </tbody>
+        </table>
+    }
+</section>
+
+<section>
+    <h2>JS &rarr; .NET</h2>
+    <p>JavaScript calls a <code>[JSInvokable]</code> method through a <code>DotNetObjectReference</code>.</p>
+    <button class="btn" @onclick="CallBackFromJsAsync">Ask JS to call .NET</button>
+    @if (_callbackMessage is not null)
+    {
+        <p role="status">@_callbackMessage</p>
+    }
+</section>
+
+<section>
+    <h2>Blazor &rarr; Win32</h2>
+    <p>A component calls <code>MessageBoxW</code> directly through <code>[LibraryImport]</code>.</p>
+    <button class="btn" @onclick="ShowNativeMessageBox">Show native message box</button>
+</section>
+
+@code {
+    private DotNetObjectReference<JsInterop>? _selfReference;
+    private BrowserInfo? _browserInfo;
+    private string? _callbackMessage;
+
+    private async Task LoadBrowserInfoAsync()
+    {
+        var json = await JS.InvokeAsync<string>("interopSample.getBrowserInfo");
+        _browserInfo = JsonSerializer.Deserialize(json, AppJsonContext.Default.BrowserInfo);
+    }
+
+    private async Task CallBackFromJsAsync()
+    {
+        _selfReference ??= DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("interopSample.callDotNet", _selfReference);
+    }
+
+    [JSInvokable]
+    public void ReceiveFromJs(string message)
+    {
+        _callbackMessage = message;
+        StateHasChanged();
+    }
+
+    private void ShowNativeMessageBox() => NativeDialogs.ShowInformation("Hello from a Razor component!");
+
+    public void Dispose() => _selfReference?.Dispose();
+}

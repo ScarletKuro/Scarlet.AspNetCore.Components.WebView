@@ -89,6 +89,32 @@ Work for the UI thread goes through that thread's `DirectNMessageQueue` from
 DirectN application Blazor shares one queue, ordering and `SynchronizationContext` with the rest of the UI thread. If the
 thread has no `SynchronizationContext` yet, the view installs the queue's.
 
+### Using a UI framework's dispatcher
+
+When a UI framework owns the thread, such as Avalonia, pass its dispatcher instead, so Blazor's work shares its ordering,
+priorities and unhandled-exception handling: `new BlazorWebView(parentHwnd, dispatcher)`. The dispatcher is a
+`DirectNDispatcher` whose one method queues a callback on the UI thread:
+
+```csharp
+sealed class FrameworkDispatcher : DirectNDispatcher
+{
+    public override bool CheckAccess() => /* is this the UI thread? */;
+
+    protected override bool TryEnqueue(SendOrPostCallback callback, object? state, Action<object?> onAbandoned)
+    {
+        // Queue callback(state) on the UI thread; return false if the framework no longer accepts work,
+        // and call onAbandoned(state) if it drops accepted work without running it (e.g. at shutdown).
+    }
+}
+```
+
+Its contract, documented on `TryEnqueue`: always queue (never run inline), keep the caller's `ExecutionContext`, run under
+the UI thread's `SynchronizationContext`, run each accepted callback once or report it abandoned, and route the callback's
+exceptions to the framework's unhandled-exception handling. The view keeps Blazor's dispatching rules on top of it: work
+dispatched on the UI thread runs inline, work the dispatcher drops faults its task instead of never completing, and
+exceptions left unhandled by `UnhandledException` are rethrown through the dispatcher. See
+[the Avalonia example](../examples/Avalonia.BlazorApp/AvaloniaUiDispatcher.cs) for an implementation.
+
 ## API
 
 The API mirrors the WinForms/WPF `BlazorWebView`: `UrlLoading`, `BlazorWebViewInitializing` (user data folder, browser
@@ -97,7 +123,8 @@ folder, environment options, or a pre-created environment), `BlazorWebViewInitia
 `AddBlazorWebViewDeveloperTools`. On top of that:
 
 - `UnhandledException`: reports exceptions from work dispatched to the UI thread. Set `Handled` to keep the process
-  alive; otherwise the exception is rethrown as a normal unhandled exception.
+  alive; otherwise the exception is rethrown as a normal unhandled exception (through the UI framework's dispatcher,
+  when the view was created with one).
 - `Bounds`, `IsVisible`, `MoveFocus`, `NotifyParentWindowPositionChanged`: control the WebView2 controller.
 - `WebView` / `Controller`: the underlying WebView2Aot `ICoreWebView2` / `ICoreWebView2Controller` objects.
 
